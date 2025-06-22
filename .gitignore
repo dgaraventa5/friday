@@ -31,7 +31,7 @@ ui-debug.log*
 .runtimeconfig.json
 
 # Environment files
-.env.*
+# .env.*
 !.env.example
 
 # Coverage reports
