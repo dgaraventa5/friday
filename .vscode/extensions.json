@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "editorconfig.editorconfig",
+    "bradlc.vscode-tailwindcss",
+    "formulahendry.auto-rename-tag",
+    "mikestead.dotenv",
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github"
+  ]
+}

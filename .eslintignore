@@ -1,0 +1,11 @@
+node_modules
+build
+dist
+dist-ssr
+.vscode
+.firebase
+public
+*.test.js
+*.test.jsx
+*.test.ts
+*.test.tsx

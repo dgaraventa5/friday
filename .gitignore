@@ -23,3 +23,19 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Firebase
+.firebase/
+firebase-debug.log*
+ui-debug.log*
+.runtimeconfig.json
+
+# Environment files
+.env.*
+!.env.example
+
+# Coverage reports
+coverage/
+
+# Build artifacts
+build/
