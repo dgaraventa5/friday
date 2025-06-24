@@ -13,7 +13,7 @@ import { LoadingOverlay } from './components/LoadingOverlay';
 import { LoadingState } from './components/LoadingState';
 import { Task } from './types/task';
 import { useState, useEffect, useRef } from 'react';
-import { isToday, startOfDay } from 'date-fns';
+import { isToday } from 'date-fns';
 import { assignStartDates } from './utils/taskPrioritization';
 import { BottomNav } from './components/BottomNav';
 import { SchedulePage } from './components/SchedulePage';
@@ -23,13 +23,14 @@ import { handleRecurringTaskCompletion } from './utils/recurringTaskService';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DevTools } from './components/DevTools';
 import { Button } from './components/Button';
+import { getTodayKey, getDateKey } from './utils/dateUtils';
 
-// Helper to get a string key for today (YYYY-MM-DD)
-function getTodayKey() {
-  const today = new Date();
-  // Use local date string to avoid timezone issues
-  return today.toLocaleDateString('en-CA'); // en-CA uses YYYY-MM-DD format
-}
+// Helper to get a string key for today (YYYY-MM-DD) - DEPRECATED, use getTodayKey from dateUtils
+// function getTodayKey() {
+//   const today = new Date();
+//   // Use local date string to avoid timezone issues
+//   return today.toLocaleDateString('en-CA'); // en-CA uses YYYY-MM-DD format
+// }
 
 function AppContent() {
   // Get global state and dispatch from context
@@ -37,7 +38,10 @@ function AppContent() {
   const { tasks, categories, ui, onboarding_complete } = state;
   const [isTaskInputExpanded, setIsTaskInputExpanded] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [recurringModal, setRecurringModal] = useState<{completedTask: Task, nextTask: Task} | null>(null);
+  const [recurringModal, setRecurringModal] = useState<{
+    completedTask: Task;
+    nextTask: Task;
+  } | null>(null);
   const todayKey = getTodayKey();
   // Sticky set of completed focus task IDs for today
   const [completedFocusIds, setCompletedFocusIds] = useState<string[]>(() => {
@@ -48,83 +52,106 @@ function AppContent() {
 
   // Update completedFocusIds when a task is completed
   useEffect(() => {
-    const completedToday = tasks.filter(
-      t => t.completed && !completedFocusIds.includes(t.id) && isToday(t.dueDate)
-    ).map(t => t.id);
+    const completedToday = tasks
+      .filter(
+        (t) =>
+          t.completed &&
+          !completedFocusIds.includes(t.id) &&
+          isToday(t.dueDate),
+      )
+      .map((t) => t.id);
     if (completedToday.length > 0) {
       const updated = [...completedFocusIds, ...completedToday];
       setCompletedFocusIds(updated);
-      localStorage.setItem('completed_focus_' + todayKey, JSON.stringify(updated));
+      localStorage.setItem(
+        'completed_focus_' + todayKey,
+        JSON.stringify(updated),
+      );
     }
   }, [tasks, completedFocusIds, todayKey]);
 
   // Clean up old completed focus sets when the day changes
   useEffect(() => {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith('completed_focus_') && k !== 'completed_focus_' + todayKey);
-    keys.forEach(k => localStorage.removeItem(k));
+    const keys = Object.keys(localStorage).filter(
+      (k) =>
+        k.startsWith('completed_focus_') && k !== 'completed_focus_' + todayKey,
+    );
+    keys.forEach((k) => localStorage.removeItem(k));
   }, [todayKey]);
-  
+
   // Process recurring tasks once a day or when the app loads
   useEffect(() => {
+    // Normalize all dates to ensure consistency
+    dispatch({ type: 'NORMALIZE_ALL_DATES' });
+
     // Process recurring tasks on load
     dispatch({ type: 'PROCESS_RECURRING_TASKS' });
-    
+
     // Set up a check at midnight each day
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
-    
+
     const timeUntilMidnight = tomorrow.getTime() - now.getTime();
-    
+
     const midnightTimer = setTimeout(() => {
+      dispatch({ type: 'NORMALIZE_ALL_DATES' });
       dispatch({ type: 'PROCESS_RECURRING_TASKS' });
     }, timeUntilMidnight);
-    
+
     return () => clearTimeout(midnightTimer);
   }, [dispatch, todayKey]); // todayKey changes when the date changes
 
   // Always use assigned tasks for rendering
   const assignedTasks = assignStartDates(tasks, 4);
-  
+
   // Get today's date as a string in YYYY-MM-DD format for comparison
-  const todayDateString = startOfDay(new Date()).toLocaleDateString('en-CA');
-  
+  const todayDateString = getTodayKey();
+
   // Filter tasks that have a startDate matching today
-  const todayFocusTasks = assignedTasks.filter(t => {
-    const taskDateString = startOfDay(new Date(t.startDate)).toLocaleDateString('en-CA');
+  const todayFocusTasks = assignedTasks.filter((t) => {
+    const taskDateString = getDateKey(t.startDate);
     return taskDateString === todayDateString;
   });
 
   // Debug log for progress circle
-  console.log('Today\'s Focus Tasks:', todayFocusTasks);
-  console.log('Today\'s Focus Completed:', todayFocusTasks.filter(t => t.completed).length, 'of', todayFocusTasks.length);
-  console.log('Today\'s date string for comparison:', todayDateString);
-  console.log('Task startDate strings:', assignedTasks.map(t => ({ 
-    name: t.name, 
-    startDate: t.startDate,
-    startDateString: startOfDay(new Date(t.startDate)).toLocaleDateString('en-CA'),
-    isToday: startOfDay(new Date(t.startDate)).toLocaleDateString('en-CA') === todayDateString
-  })));
+  console.log("Today's Focus Tasks:", todayFocusTasks);
+  console.log(
+    "Today's Focus Completed:",
+    todayFocusTasks.filter((t) => t.completed).length,
+    'of',
+    todayFocusTasks.length,
+  );
+  console.log("Today's date string for comparison:", todayDateString);
+  console.log(
+    'Task startDate strings:',
+    assignedTasks.map((t) => ({
+      name: t.name,
+      startDate: t.startDate,
+      startDateString: getDateKey(t.startDate),
+      isToday: getDateKey(t.startDate) === todayDateString,
+    })),
+  );
 
   // Mark a task as complete/incomplete
   const handleToggleComplete = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    
+    const task = tasks.find((t) => t.id === taskId);
+
     if (task && !task.completed && task.isRecurring && task.recurringInterval) {
       // Generate next occurrence when marking a recurring task as complete
       const nextTask = handleRecurringTaskCompletion(task);
       if (nextTask) {
         // Show the modal with information about the recurring task
         setRecurringModal({ completedTask: task, nextTask });
-        
+
         // Add the new recurring task
         setTimeout(() => {
           dispatch({ type: 'ADD_TASK', payload: nextTask });
         }, 100);
       }
     }
-    
+
     dispatch({ type: 'TOGGLE_TASK_COMPLETE', payload: taskId });
   };
 
@@ -155,41 +182,43 @@ function AppContent() {
   };
 
   // Navigation handlers
-  const handleNavToday = () => dispatch({ type: 'SET_CURRENT_PAGE', payload: 'today' });
+  const handleNavToday = () =>
+    dispatch({ type: 'SET_CURRENT_PAGE', payload: 'today' });
   const handleNavAdd = () => {
     setIsTaskInputExpanded(true);
   };
-  const handleNavSchedule = () => dispatch({ type: 'SET_CURRENT_PAGE', payload: 'schedule' });
+  const handleNavSchedule = () =>
+    dispatch({ type: 'SET_CURRENT_PAGE', payload: 'schedule' });
 
   // Modal close on outside click or Escape
   const modalRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!isTaskInputExpanded && !editingTask) return;
-    
+
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         if (isTaskInputExpanded) setIsTaskInputExpanded(false);
         if (editingTask) setEditingTask(null);
       }
     }
-    
+
     function handleClick(e: MouseEvent) {
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
         if (isTaskInputExpanded) setIsTaskInputExpanded(false);
         if (editingTask) setEditingTask(null);
       }
     }
-    
+
     // Scroll lock
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    
+
     // Swipe down to close (touch devices)
     let startY: number | null = null;
     function handleTouchStart(e: TouchEvent) {
       startY = e.touches[0].clientY;
     }
-    
+
     function handleTouchMove(e: TouchEvent) {
       if (startY !== null) {
         const deltaY = e.touches[0].clientY - startY;
@@ -200,12 +229,12 @@ function AppContent() {
         }
       }
     }
-    
+
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('mousedown', handleClick);
     document.addEventListener('touchstart', handleTouchStart);
     document.addEventListener('touchmove', handleTouchMove);
-    
+
     return () => {
       document.body.style.overflow = originalOverflow;
       document.removeEventListener('keydown', handleKeyDown);
@@ -228,18 +257,22 @@ function AppContent() {
     <div className="min-h-screen bg-gray-100">
       {/* Overlay for loading state */}
       <LoadingOverlay show={ui.isLoading} message="Loading your tasks..." />
-      
+
       {/* App header with progress circle */}
       <ErrorBoundary>
-        <Header 
+        <Header
           onOpenSettings={handleOpenSettings}
           todayTaskCount={todayFocusTasks.length}
           totalTaskCount={tasks.length}
-          todayTasksCompleted={todayFocusTasks.filter(t => t.completed).length}
-          onProcessRecurring={() => dispatch({ type: 'PROCESS_RECURRING_TASKS' })}
+          todayTasksCompleted={
+            todayFocusTasks.filter((t) => t.completed).length
+          }
+          onProcessRecurring={() =>
+            dispatch({ type: 'PROCESS_RECURRING_TASKS' })
+          }
         />
       </ErrorBoundary>
-      
+
       <main className="mx-auto px-2 py-4 w-full max-w-[600px] md:px-6 md:py-8 lg:max-w-[900px]">
         <div className="w-full flex flex-col">
           {/* Main content: task list/cards, now full width on large screens */}
@@ -254,20 +287,18 @@ function AppContent() {
                 <TaskErrorBoundary>
                   {ui.isLoading ? (
                     <LoadingState message="Loading tasks..." />
+                  ) : ui.currentPage === 'schedule' ? (
+                    <SchedulePage
+                      tasks={assignedTasks}
+                      onToggleComplete={handleToggleComplete}
+                      onEdit={handleEditTask}
+                    />
                   ) : (
-                    ui.currentPage === 'schedule' ? (
-                      <SchedulePage 
-                        tasks={assignedTasks} 
-                        onToggleComplete={handleToggleComplete} 
-                        onEdit={handleEditTask}
-                      />
-                    ) : (
-                      <TaskList 
-                        tasks={todayFocusTasks}
-                        onToggleComplete={handleToggleComplete}
-                        onEdit={handleEditTask}
-                      />
-                    )
+                    <TaskList
+                      tasks={todayFocusTasks}
+                      onToggleComplete={handleToggleComplete}
+                      onEdit={handleEditTask}
+                    />
                   )}
                 </TaskErrorBoundary>
               </ErrorBoundary>
@@ -275,7 +306,7 @@ function AppContent() {
           </div>
         </div>
       </main>
-      
+
       {/* Bottom navigation */}
       <BottomNav
         currentPage={ui.currentPage}
@@ -283,37 +314,37 @@ function AppContent() {
         onAdd={handleNavAdd}
         onSchedule={handleNavSchedule}
       />
-      
+
       {/* Task input modal */}
       {isTaskInputExpanded && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-40">
-          <div 
+          <div
             ref={modalRef}
             className="bg-white rounded-t-xl w-full max-w-lg p-4 pb-8 animate-slide-up"
-            style={{ 
+            style={{
               maxHeight: '80vh',
-              paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 2rem)'
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 2rem)',
             }}
           >
-            <TaskInput 
+            <TaskInput
               categories={categories}
-              onAddTask={handleAddTask} 
-              onCancel={() => setIsTaskInputExpanded(false)} 
+              onAddTask={handleAddTask}
+              onCancel={() => setIsTaskInputExpanded(false)}
               isExpanded={true}
             />
           </div>
         </div>
       )}
-      
+
       {/* Edit task modal */}
       {editingTask && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-40">
-          <div 
+          <div
             ref={modalRef}
             className="bg-white rounded-t-xl w-full max-w-lg p-4 pb-8 animate-slide-up"
-            style={{ 
+            style={{
               maxHeight: '80vh',
-              paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 2rem)'
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 2rem)',
             }}
           >
             <EditTaskModal
@@ -326,7 +357,7 @@ function AppContent() {
           </div>
         </div>
       )}
-      
+
       {/* Recurring task modal */}
       {recurringModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -341,34 +372,46 @@ function AppContent() {
       {/* Settings modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div 
+          <div
             className="bg-white rounded-xl w-full max-w-lg p-6 animate-fade-in"
-            style={{ 
+            style={{
               maxHeight: '80vh',
-              overflowY: 'auto'
+              overflowY: 'auto',
             }}
           >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Settings</h2>
-              <button 
+              <button
                 onClick={() => setShowSettings(false)}
                 className="p-2 text-neutral-600 hover:text-neutral-900 rounded-full"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
               </button>
             </div>
-            
+
             <div className="space-y-4">
               {/* Settings content will go here */}
-              <p className="text-neutral-600">Settings options will be added here.</p>
+              <p className="text-neutral-600">
+                Settings options will be added here.
+              </p>
             </div>
-            
+
             <div className="mt-6">
-              <Button 
-                onClick={() => setShowSettings(false)} 
+              <Button
+                onClick={() => setShowSettings(false)}
                 variant="primary"
                 className="w-full"
               >

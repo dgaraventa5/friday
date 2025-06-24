@@ -2,11 +2,28 @@
 // Provides global app state, reducer, and context for tasks, categories, preferences, and UI state.
 // Handles loading/saving from localStorage and exposes state/dispatch to the app.
 
-import { createContext, useContext, useReducer, ReactNode, useEffect, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useReducer,
+  ReactNode,
+  useEffect,
+  useState,
+  useCallback,
+  memo,
+} from 'react';
 import { Task, Category, UserPreferences } from '../types/task';
-import { saveTasks, loadTasks, saveCategories, loadCategories, savePreferences, loadPreferences } from '../utils/localStorage';
+import {
+  saveTasks,
+  loadTasks,
+  saveCategories,
+  loadCategories,
+  savePreferences,
+  loadPreferences,
+} from '../utils/localStorage';
 import { processRecurringTasks } from '../utils/recurringTaskService';
 import { useAuth } from './AuthContext';
+import { normalizeDate } from '../utils/dateUtils';
 
 // Define the shape of our global state
 interface AppState {
@@ -39,7 +56,8 @@ type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_ONBOARDING_COMPLETE'; payload: boolean }
-  | { type: 'PROCESS_RECURRING_TASKS' };
+  | { type: 'PROCESS_RECURRING_TASKS' }
+  | { type: 'NORMALIZE_ALL_DATES' };
 
 // Initial state for the app
 const initialState: AppState = {
@@ -78,26 +96,26 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'UPDATE_TASK':
       return {
         ...state,
-        tasks: state.tasks.map(task =>
-          task.id === action.payload.id ? action.payload : task
+        tasks: state.tasks.map((task) =>
+          task.id === action.payload.id ? action.payload : task,
         ),
       };
     case 'DELETE_TASK':
       return {
         ...state,
-        tasks: state.tasks.filter(task => task.id !== action.payload),
+        tasks: state.tasks.filter((task) => task.id !== action.payload),
       };
     case 'TOGGLE_TASK_COMPLETE':
       return {
         ...state,
-        tasks: state.tasks.map(task =>
+        tasks: state.tasks.map((task) =>
           task.id === action.payload
             ? {
                 ...task,
                 completed: !task.completed,
                 completedAt: !task.completed ? new Date() : undefined,
               }
-            : task
+            : task,
         ),
       };
     case 'SET_CATEGORIES':
@@ -107,14 +125,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'UPDATE_CATEGORY':
       return {
         ...state,
-        categories: state.categories.map(category =>
-          category.id === action.payload.id ? action.payload : category
+        categories: state.categories.map((category) =>
+          category.id === action.payload.id ? action.payload : category,
         ),
       };
     case 'DELETE_CATEGORY':
       return {
         ...state,
-        categories: state.categories.filter(category => category.id !== action.payload),
+        categories: state.categories.filter(
+          (category) => category.id !== action.payload,
+        ),
       };
     case 'UPDATE_PREFERENCES':
       return {
@@ -142,28 +162,47 @@ function appReducer(state: AppState, action: AppAction): AppState {
       const processedTasks = processRecurringTasks(state.tasks);
       return { ...state, tasks: processedTasks };
     }
+    case 'NORMALIZE_ALL_DATES': {
+      // Normalize all dates in all tasks
+      const normalizedTasks = state.tasks.map((task) => ({
+        ...task,
+        startDate: normalizeDate(
+          task.startDate || task.dueDate || task.createdAt,
+        ),
+        dueDate: normalizeDate(task.dueDate),
+        createdAt: normalizeDate(task.createdAt),
+        updatedAt: normalizeDate(task.updatedAt),
+        completedAt: task.completedAt
+          ? normalizeDate(task.completedAt)
+          : undefined,
+      }));
+
+      console.log('Normalized all dates in tasks');
+      return { ...state, tasks: normalizedTasks };
+    }
     default:
       return state;
   }
 }
 
 // Provider component: wraps the app and provides state/dispatch
-export function AppProvider({ children }: { children: ReactNode }) {
+function AppProviderComponent({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const { authState } = useAuth();
   const { user } = authState;
+  const userId = user?.uid; // Create stable reference to user ID
   const [testMode, setTestMode] = useState(false);
 
   // Function to toggle test mode for onboarding testing
-  const toggleTestMode = () => {
-    setTestMode(prev => !prev);
+  const toggleTestMode = useCallback(() => {
+    setTestMode((prev) => !prev);
     if (!testMode) {
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: false });
       console.log('Test mode activated: Onboarding reset');
     } else {
       console.log('Test mode deactivated');
     }
-  };
+  }, [testMode, dispatch]);
 
   // Effect for test mode keyboard shortcut (Ctrl+Shift+O)
   useEffect(() => {
@@ -176,16 +215,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [testMode]);
+  }, [toggleTestMode]);
 
   // Load data from localStorage on mount, using user ID if available
   useEffect(() => {
-    if (user) {
-      const userPrefix = `user_${user.uid}_`;
+    if (userId) {
+      const userPrefix = `user_${userId}_`;
       const loadedTasks = loadTasks(userPrefix);
       const loadedCategories = loadCategories(userPrefix);
       const loadedPreferences = loadPreferences(userPrefix);
-      const onboardingComplete = localStorage.getItem(`${userPrefix}onboarding_complete`) === 'true';
+      const onboardingComplete =
+        localStorage.getItem(`${userPrefix}onboarding_complete`) === 'true';
 
       if (loadedTasks.length > 0) {
         dispatch({ type: 'SET_TASKS', payload: loadedTasks });
@@ -212,39 +252,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_CATEGORIES', payload: [] });
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: false });
     }
-  }, [user?.uid, testMode]);
+  }, [userId, testMode, dispatch]);
 
   // Save tasks to localStorage when they change
   useEffect(() => {
-    if (state.tasks.length > 0 && user) {
-      const userPrefix = `user_${user.uid}_`;
+    if (state.tasks.length > 0 && userId) {
+      const userPrefix = `user_${userId}_`;
       saveTasks(state.tasks, userPrefix);
     }
-  }, [state.tasks, user?.uid]);
+  }, [state.tasks, userId]);
 
   // Save categories to localStorage when they change
   useEffect(() => {
-    if (state.categories.length > 0 && user) {
-      const userPrefix = `user_${user.uid}_`;
+    if (state.categories.length > 0 && userId) {
+      const userPrefix = `user_${userId}_`;
       saveCategories(state.categories, userPrefix);
     }
-  }, [state.categories, user?.uid]);
+  }, [state.categories, userId]);
 
   // Save preferences to localStorage when they change
   useEffect(() => {
-    if (state.preferences && user) {
-      const userPrefix = `user_${user.uid}_`;
+    if (state.preferences && userId) {
+      const userPrefix = `user_${userId}_`;
       savePreferences(state.preferences, userPrefix);
     }
-  }, [state.preferences, user?.uid]);
+  }, [state.preferences, userId]);
 
   // Save onboarding_complete to localStorage when it changes
   useEffect(() => {
-    if (state.onboarding_complete && user && !testMode) {
-      const userPrefix = `user_${user.uid}_`;
+    if (state.onboarding_complete && userId && !testMode) {
+      const userPrefix = `user_${userId}_`;
       localStorage.setItem(`${userPrefix}onboarding_complete`, 'true');
     }
-  }, [state.onboarding_complete, user?.uid, testMode]);
+  }, [state.onboarding_complete, userId, testMode]);
 
   return (
     <AppContext.Provider value={{ state, dispatch, testMode, toggleTestMode }}>
@@ -253,6 +293,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Memoize the provider component to avoid unnecessary re-renders
+export const AppProvider = memo(AppProviderComponent);
+
 // Custom hook to use the context
 export function useApp() {
   const context = useContext(AppContext);
@@ -260,4 +303,7 @@ export function useApp() {
     throw new Error('useApp must be used within an AppProvider');
   }
   return context;
-} 
+}
+
+// Export the context for use in tests
+export { AppContext };

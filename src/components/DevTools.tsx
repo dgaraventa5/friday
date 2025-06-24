@@ -3,12 +3,34 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { resetUserData } from '../utils/firebase';
 import { Button } from './Button';
+import { assignStartDates } from '../utils/taskPrioritization';
+import { getTodayKey, getTomorrowKey, getDateKey } from '../utils/dateUtils';
 
 export function DevTools() {
   const [isOpen, setIsOpen] = useState(false);
-  const { testMode, toggleTestMode } = useApp();
+  const { state, testMode, toggleTestMode } = useApp();
   const { authState } = useAuth();
   const { user } = authState;
+  const { tasks } = state;
+  const [showDebug, setShowDebug] = useState(false);
+
+  // Get assigned tasks
+  const assignedTasks = assignStartDates(tasks, 4);
+
+  // Get today's and tomorrow's date keys
+  const todayKey = getTodayKey();
+  const tomorrowKey = getTomorrowKey();
+
+  // Count tasks by day
+  const todayTasks = assignedTasks.filter(
+    (t) => getDateKey(t.startDate) === todayKey,
+  );
+  const tomorrowTasks = assignedTasks.filter(
+    (t) => getDateKey(t.startDate) === tomorrowKey,
+  );
+
+  const todayCompleted = todayTasks.filter((t) => t.completed).length;
+  const tomorrowCompleted = tomorrowTasks.filter((t) => t.completed).length;
 
   if (!user) return null;
 
@@ -108,6 +130,86 @@ export function DevTools() {
           </div>
         </div>
       )}
+
+      <div className="flex flex-col space-y-2">
+        <button
+          onClick={() => setShowDebug(!showDebug)}
+          className="bg-neutral-800 text-white p-2 rounded-full shadow-lg"
+          title="Toggle Debug Panel"
+        >
+          🐞
+        </button>
+
+        {showDebug && (
+          <div className="bg-white border border-neutral-200 rounded-lg shadow-lg p-4 w-80 text-xs">
+            <h3 className="font-bold mb-2">Debug Info</h3>
+
+            <div className="mb-2">
+              <div className="font-medium">Test Mode</div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={testMode}
+                  onChange={toggleTestMode}
+                  className="mr-2"
+                />
+                <span>{testMode ? 'Enabled' : 'Disabled'}</span>
+              </div>
+            </div>
+
+            <div className="mb-2">
+              <div className="font-medium">Task Allocation</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>Today ({todayKey}):</div>
+                <div>
+                  {todayTasks.length} tasks ({todayCompleted} completed)
+                </div>
+                <div>Tomorrow ({tomorrowKey}):</div>
+                <div>
+                  {tomorrowTasks.length} tasks ({tomorrowCompleted} completed)
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-2">
+              <div className="font-medium">Today's Tasks</div>
+              <ul className="list-disc pl-4">
+                {todayTasks.map((task) => (
+                  <li
+                    key={task.id}
+                    className={task.completed ? 'line-through' : ''}
+                  >
+                    {task.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mb-2">
+              <div className="font-medium">Tomorrow's Tasks</div>
+              <ul className="list-disc pl-4">
+                {tomorrowTasks.map((task) => (
+                  <li
+                    key={task.id}
+                    className={task.completed ? 'line-through' : ''}
+                  >
+                    {task.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="text-right mt-2">
+              <button
+                onClick={() => setShowDebug(false)}
+                className="text-neutral-500 hover:text-neutral-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
-} 
+}
