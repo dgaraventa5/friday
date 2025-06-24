@@ -12,8 +12,18 @@ import {
 // Debug: Log environment variables
 console.log('Firebase environment variables:');
 console.log('API Key exists:', !!import.meta.env.VITE_FIREBASE_API_KEY);
+console.log(
+  'API Key value:',
+  import.meta.env.VITE_FIREBASE_API_KEY
+    ? 'First few chars: ' +
+        import.meta.env.VITE_FIREBASE_API_KEY.substring(0, 5) +
+        '...'
+    : 'undefined',
+);
 console.log('Auth Domain exists:', !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
+console.log('Auth Domain value:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
 console.log('Project ID exists:', !!import.meta.env.VITE_FIREBASE_PROJECT_ID);
+console.log('Project ID value:', import.meta.env.VITE_FIREBASE_PROJECT_ID);
 console.log(
   'Storage Bucket exists:',
   !!import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
@@ -24,20 +34,39 @@ console.log(
 );
 console.log('App ID exists:', !!import.meta.env.VITE_FIREBASE_APP_ID);
 
+// Helper function to strip quotes if they exist
+const stripQuotes = (str: string | undefined): string | undefined => {
+  if (!str) return str;
+  return str.replace(/^["'](.*)["']$/, '$1');
+};
+
 // Your web app's Firebase configuration
 // NOTE: Replace these with your actual Firebase config values from the Firebase console
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  apiKey: stripQuotes(import.meta.env.VITE_FIREBASE_API_KEY),
   // Always use the Firebase Auth Domain from environment variables
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  authDomain: stripQuotes(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
+  projectId: stripQuotes(import.meta.env.VITE_FIREBASE_PROJECT_ID),
+  storageBucket: stripQuotes(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET),
+  messagingSenderId: stripQuotes(
+    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  ),
+  appId: stripQuotes(import.meta.env.VITE_FIREBASE_APP_ID),
 };
 
 // Log the actual configuration being used
-console.log('Using authDomain:', firebaseConfig.authDomain);
+console.log('Firebase config being used:', {
+  apiKey: firebaseConfig.apiKey
+    ? 'First few chars: ' + firebaseConfig.apiKey.substring(0, 5) + '...'
+    : 'undefined',
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId,
+  storageBucket: firebaseConfig.storageBucket,
+  messagingSenderId: firebaseConfig.messagingSenderId,
+  appId: firebaseConfig.appId
+    ? 'First few chars: ' + firebaseConfig.appId.substring(0, 5) + '...'
+    : 'undefined',
+});
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
