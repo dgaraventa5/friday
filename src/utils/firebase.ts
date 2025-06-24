@@ -35,23 +35,43 @@ console.log(
 console.log('App ID exists:', !!import.meta.env.VITE_FIREBASE_APP_ID);
 
 // Helper function to strip quotes if they exist
-const stripQuotes = (str: string | undefined): string | undefined => {
-  if (!str) return str;
+const stripQuotes = (str: string): string => {
   return str.replace(/^["'](.*)["']$/, '$1');
 };
 
+// Helper function to get environment variables with fallbacks
+const getEnvVar = (key: string, fallback: string): string => {
+  const envVar = import.meta.env[key];
+  if (!envVar) {
+    console.warn(`Environment variable ${key} not found, using fallback`);
+    return fallback;
+  }
+  return stripQuotes(envVar as string);
+};
+
 // Your web app's Firebase configuration
-// NOTE: Replace these with your actual Firebase config values from the Firebase console
 const firebaseConfig = {
-  apiKey: stripQuotes(import.meta.env.VITE_FIREBASE_API_KEY),
-  // Always use the Firebase Auth Domain from environment variables
-  authDomain: stripQuotes(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
-  projectId: stripQuotes(import.meta.env.VITE_FIREBASE_PROJECT_ID),
-  storageBucket: stripQuotes(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET),
-  messagingSenderId: stripQuotes(
-    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  apiKey: getEnvVar(
+    'VITE_FIREBASE_API_KEY',
+    'AIzaSyAYh45ZeAlQiryqEmwDAQgvcU3OoxO3EV8',
   ),
-  appId: stripQuotes(import.meta.env.VITE_FIREBASE_APP_ID),
+  authDomain: getEnvVar(
+    'VITE_FIREBASE_AUTH_DOMAIN',
+    'friday---ai-task-planner.firebaseapp.com',
+  ),
+  projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', 'friday---ai-task-planner'),
+  storageBucket: getEnvVar(
+    'VITE_FIREBASE_STORAGE_BUCKET',
+    'friday---ai-task-planner.appspot.com',
+  ),
+  messagingSenderId: getEnvVar(
+    'VITE_FIREBASE_MESSAGING_SENDER_ID',
+    '702681640400',
+  ),
+  appId: getEnvVar(
+    'VITE_FIREBASE_APP_ID',
+    '1:702681640400:web:e887aa1c810d47e7f11dd5',
+  ),
 };
 
 // Log the actual configuration being used
