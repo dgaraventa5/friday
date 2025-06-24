@@ -1,12 +1,12 @@
 // Firebase configuration and authentication services
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  GoogleAuthProvider, 
-  signInWithPopup, 
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
   signOut,
   onAuthStateChanged,
-  User
+  User,
 } from 'firebase/auth';
 
 // Debug: Log environment variables
@@ -14,23 +14,26 @@ console.log('Firebase environment variables:');
 console.log('API Key exists:', !!import.meta.env.VITE_FIREBASE_API_KEY);
 console.log('Auth Domain exists:', !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
 console.log('Project ID exists:', !!import.meta.env.VITE_FIREBASE_PROJECT_ID);
-console.log('Storage Bucket exists:', !!import.meta.env.VITE_FIREBASE_STORAGE_BUCKET);
-console.log('Messaging Sender ID exists:', !!import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID);
+console.log(
+  'Storage Bucket exists:',
+  !!import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+);
+console.log(
+  'Messaging Sender ID exists:',
+  !!import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+);
 console.log('App ID exists:', !!import.meta.env.VITE_FIREBASE_APP_ID);
 
 // Your web app's Firebase configuration
 // NOTE: Replace these with your actual Firebase config values from the Firebase console
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  // Use the current domain for authentication to avoid cross-origin issues
-  // This helps prevent the "missing initial state" error
-  authDomain: window.location.hostname === 'localhost' 
-    ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN 
-    : window.location.hostname,
+  // Always use the Firebase Auth Domain from environment variables
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 // Log the actual configuration being used
@@ -43,7 +46,7 @@ const googleProvider = new GoogleAuthProvider();
 
 // Configure Google provider for enhanced security
 googleProvider.setCustomParameters({
-  prompt: 'select_account'
+  prompt: 'select_account',
 });
 
 // Sign in with Google popup
@@ -82,18 +85,18 @@ export const getCurrentUser = (): Promise<User | null> => {
 // Reset user data for testing onboarding
 export const resetUserData = (userId: string): void => {
   const userPrefix = `user_${userId}_`;
-  
+
   // Get all localStorage keys
-  Object.keys(localStorage).forEach(key => {
+  Object.keys(localStorage).forEach((key) => {
     if (key.startsWith(userPrefix)) {
       localStorage.removeItem(key);
     }
   });
-  
+
   console.log(`Reset user data for user ID: ${userId}`);
-  
+
   // Force reload to restart the app
   window.location.reload();
 };
 
-export { auth }; 
+export { auth };
