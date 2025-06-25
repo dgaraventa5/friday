@@ -3,10 +3,30 @@
 @tailwind utilities;
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Add these new utility classes */
+.viewport-height {
+  height: calc(100vh - var(--header-height) - var(--bottom-nav-height));
+  max-height: calc(100vh - var(--header-height) - var(--bottom-nav-height));
+  overflow-y: hidden;
+}
+
+.schedule-page {
+  height: calc(100vh - var(--header-height) - var(--bottom-nav-height));
+  max-height: calc(100vh - var(--header-height) - var(--bottom-nav-height));
+  overflow-y: auto;
+}
+
+:root {
+  --header-height: 72px;
+  --bottom-nav-height: 64px;
 }

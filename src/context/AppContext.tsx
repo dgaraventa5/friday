@@ -1,6 +1,6 @@
 // AppContext.tsx
 // Provides global app state, reducer, and context for tasks, categories, preferences, and UI state.
-// Handles loading/saving from localStorage and exposes state/dispatch to the app.
+// Handles loading/saving from Firestore with localStorage fallback and exposes state/dispatch to the app.
 
 import {
   createContext,
@@ -14,13 +14,21 @@ import {
 } from 'react';
 import { Task, Category, UserPreferences } from '../types/task';
 import {
-  saveTasks,
   loadTasks,
-  saveCategories,
   loadCategories,
-  savePreferences,
   loadPreferences,
 } from '../utils/localStorage';
+import {
+  saveTasksToFirestore,
+  loadTasksFromFirestore,
+  saveCategoriesToFirestore,
+  loadCategoriesFromFirestore,
+  savePreferencesToFirestore,
+  loadPreferencesFromFirestore,
+  saveOnboardingStatusToFirestore,
+  loadOnboardingStatusFromFirestore,
+  migrateLocalStorageToFirestore,
+} from '../utils/firestoreService';
 import { processRecurringTasks } from '../utils/recurringTaskService';
 import { useAuth } from './AuthContext';
 import { normalizeDate } from '../utils/dateUtils';
@@ -192,6 +200,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   const { user } = authState;
   const userId = user?.uid; // Create stable reference to user ID
   const [testMode, setTestMode] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   // Function to toggle test mode for onboarding testing
   const toggleTestMode = useCallback(() => {
@@ -217,74 +226,242 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleTestMode]);
 
-  // Load data from localStorage on mount, using user ID if available
+  // Load data from Firestore on mount, with localStorage fallback
   useEffect(() => {
     if (userId) {
-      const userPrefix = `user_${userId}_`;
-      const loadedTasks = loadTasks(userPrefix);
-      const loadedCategories = loadCategories(userPrefix);
-      const loadedPreferences = loadPreferences(userPrefix);
-      const onboardingComplete =
-        localStorage.getItem(`${userPrefix}onboarding_complete`) === 'true';
+      console.log('[AppContext] Loading data for user:', userId);
+      dispatch({ type: 'SET_LOADING', payload: true });
+      setIsDataLoaded(false);
 
-      if (loadedTasks.length > 0) {
-        dispatch({ type: 'SET_TASKS', payload: loadedTasks });
-        // If onboarding_complete is not set but tasks exist, set it
-        if (!onboardingComplete && !testMode) {
-          dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
-          localStorage.setItem(`${userPrefix}onboarding_complete`, 'true');
-        }
-      }
-      if (loadedCategories.length > 0) {
-        dispatch({ type: 'SET_CATEGORIES', payload: loadedCategories });
-      }
-      if (loadedPreferences) {
-        dispatch({ type: 'UPDATE_PREFERENCES', payload: loadedPreferences });
-      }
-      if (onboardingComplete && !testMode) {
-        dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
-      } else if (testMode) {
-        dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: false });
-      }
+      const userPrefix = `user_${userId}_`;
+
+      // Helper function to handle errors
+      const handleError = (error: unknown) => {
+        console.error('[AppContext] Error loading data:', error);
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to load your data' });
+        dispatch({ type: 'SET_LOADING', payload: false });
+      };
+
+      // Load data from Firestore
+      Promise.all([
+        loadTasksFromFirestore(userId),
+        loadCategoriesFromFirestore(userId),
+        loadPreferencesFromFirestore(userId),
+        loadOnboardingStatusFromFirestore(userId),
+      ])
+        .then(([tasks, categories, preferences, onboardingComplete]) => {
+          console.log(
+            `[AppContext] Loaded ${tasks.length} tasks, ${categories.length} categories from Firestore`,
+          );
+
+          if (tasks.length > 0) {
+            dispatch({ type: 'SET_TASKS', payload: tasks });
+          }
+
+          // Set categories or use default categories if none exist
+          if (categories.length > 0) {
+            dispatch({ type: 'SET_CATEGORIES', payload: categories });
+          } else {
+            // Add default categories if none exist
+            const defaultCategories = [
+              {
+                id: crypto.randomUUID(),
+                name: 'Work',
+                color: '#4F46E5',
+                dailyLimit: 5,
+                icon: 'briefcase',
+              },
+              {
+                id: crypto.randomUUID(),
+                name: 'Home',
+                color: '#10B981',
+                dailyLimit: 3,
+                icon: 'home',
+              },
+              {
+                id: crypto.randomUUID(),
+                name: 'Health',
+                color: '#EF4444',
+                dailyLimit: 2,
+                icon: 'heart',
+              },
+            ];
+            dispatch({ type: 'SET_CATEGORIES', payload: defaultCategories });
+            console.log(
+              '[AppContext] Added default categories:',
+              defaultCategories.length,
+            );
+
+            // Save default categories to Firestore
+            saveCategoriesToFirestore(userId, defaultCategories).catch(
+              (error) => {
+                console.error(
+                  '[AppContext] Error saving default categories:',
+                  error,
+                );
+              },
+            );
+          }
+
+          if (preferences) {
+            dispatch({ type: 'UPDATE_PREFERENCES', payload: preferences });
+          }
+
+          if (onboardingComplete && !testMode) {
+            dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
+          } else if (testMode) {
+            dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: false });
+          }
+
+          // If no data in Firestore but we have local data, migrate it
+          if (tasks.length === 0 && categories.length === 0) {
+            const localTasks = loadTasks(userPrefix);
+            const localCategories = loadCategories(userPrefix);
+
+            if (localTasks.length > 0 || localCategories.length > 0) {
+              console.log('[AppContext] Migrating local data to Firestore');
+              migrateLocalStorageToFirestore(userId)
+                .then(() => {
+                  console.log('[AppContext] Migration complete');
+                })
+                .catch((error) => {
+                  console.error('[AppContext] Migration failed:', error);
+                });
+
+              // Use local data for now
+              if (localTasks.length > 0) {
+                dispatch({ type: 'SET_TASKS', payload: localTasks });
+              }
+              if (localCategories.length > 0) {
+                dispatch({ type: 'SET_CATEGORIES', payload: localCategories });
+              }
+            }
+          }
+
+          setIsDataLoaded(true);
+          dispatch({ type: 'SET_LOADING', payload: false });
+        })
+        .catch((error) => {
+          console.error(
+            '[AppContext] Firestore load failed, using localStorage:',
+            error,
+          );
+
+          try {
+            // Fallback to localStorage
+            const loadedTasks = loadTasks(userPrefix);
+            const loadedCategories = loadCategories(userPrefix);
+            const loadedPreferences = loadPreferences(userPrefix);
+            const onboardingComplete =
+              localStorage.getItem(`${userPrefix}onboarding_complete`) ===
+              'true';
+
+            console.log(
+              `[AppContext] Loaded ${loadedTasks.length} tasks, ${loadedCategories.length} categories from localStorage`,
+            );
+
+            if (loadedTasks.length > 0) {
+              dispatch({ type: 'SET_TASKS', payload: loadedTasks });
+            }
+            if (loadedCategories.length > 0) {
+              dispatch({ type: 'SET_CATEGORIES', payload: loadedCategories });
+            }
+            if (loadedPreferences) {
+              dispatch({
+                type: 'UPDATE_PREFERENCES',
+                payload: loadedPreferences,
+              });
+            }
+            if (onboardingComplete && !testMode) {
+              dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
+            } else if (testMode) {
+              dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: false });
+            }
+
+            setIsDataLoaded(true);
+            dispatch({ type: 'SET_LOADING', payload: false });
+          } catch (localError) {
+            handleError(localError);
+          }
+        });
     } else {
       // Reset state when user logs out
       dispatch({ type: 'SET_TASKS', payload: [] });
       dispatch({ type: 'SET_CATEGORIES', payload: [] });
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: false });
+      setIsDataLoaded(true);
     }
   }, [userId, testMode, dispatch]);
 
-  // Save tasks to localStorage when they change
+  // Save tasks to Firestore when they change
   useEffect(() => {
-    if (state.tasks.length > 0 && userId) {
-      const userPrefix = `user_${userId}_`;
-      saveTasks(state.tasks, userPrefix);
-    }
-  }, [state.tasks, userId]);
+    if (state.tasks.length > 0 && userId && isDataLoaded) {
+      console.log(`[AppContext] Saving ${state.tasks.length} tasks`);
 
-  // Save categories to localStorage when they change
-  useEffect(() => {
-    if (state.categories.length > 0 && userId) {
-      const userPrefix = `user_${userId}_`;
-      saveCategories(state.categories, userPrefix);
+      // Save to Firestore with localStorage fallback
+      saveTasksToFirestore(userId, state.tasks).catch((error) => {
+        console.error('[AppContext] Error saving tasks to Firestore:', error);
+        // Fallback to localStorage already handled in the service
+      });
     }
-  }, [state.categories, userId]);
+  }, [state.tasks, userId, isDataLoaded]);
 
-  // Save preferences to localStorage when they change
+  // Save categories to Firestore when they change
   useEffect(() => {
-    if (state.preferences && userId) {
-      const userPrefix = `user_${userId}_`;
-      savePreferences(state.preferences, userPrefix);
-    }
-  }, [state.preferences, userId]);
+    if (state.categories.length > 0 && userId && isDataLoaded) {
+      console.log(`[AppContext] Saving ${state.categories.length} categories`);
 
-  // Save onboarding_complete to localStorage when it changes
-  useEffect(() => {
-    if (state.onboarding_complete && userId && !testMode) {
-      const userPrefix = `user_${userId}_`;
-      localStorage.setItem(`${userPrefix}onboarding_complete`, 'true');
+      // Save to Firestore with localStorage fallback
+      saveCategoriesToFirestore(userId, state.categories).catch((error) => {
+        console.error(
+          '[AppContext] Error saving categories to Firestore:',
+          error,
+        );
+        // Fallback to localStorage already handled in the service
+      });
     }
-  }, [state.onboarding_complete, userId, testMode]);
+  }, [state.categories, userId, isDataLoaded]);
+
+  // Save preferences to Firestore when they change
+  useEffect(() => {
+    if (state.preferences && userId && isDataLoaded) {
+      console.log('[AppContext] Saving preferences');
+
+      // Save to Firestore with localStorage fallback
+      savePreferencesToFirestore(userId, state.preferences).catch((error) => {
+        console.error(
+          '[AppContext] Error saving preferences to Firestore:',
+          error,
+        );
+        // Fallback to localStorage already handled in the service
+      });
+    }
+  }, [state.preferences, userId, isDataLoaded]);
+
+  // Save onboarding_complete to Firestore when it changes
+  useEffect(() => {
+    if (userId && !testMode && isDataLoaded) {
+      console.log(
+        `[AppContext] Saving onboarding status: ${state.onboarding_complete}`,
+      );
+
+      // Save to Firestore with localStorage fallback
+      saveOnboardingStatusToFirestore(userId, state.onboarding_complete).catch(
+        (error) => {
+          console.error(
+            '[AppContext] Error saving onboarding status to Firestore:',
+            error,
+          );
+          // Save to localStorage as fallback
+          const userPrefix = `user_${userId}_`;
+          localStorage.setItem(
+            `${userPrefix}onboarding_complete`,
+            String(state.onboarding_complete),
+          );
+        },
+      );
+    }
+  }, [state.onboarding_complete, userId, testMode, isDataLoaded]);
 
   return (
     <AppContext.Provider value={{ state, dispatch, testMode, toggleTestMode }}>

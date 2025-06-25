@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Tasks collection
+    match /tasks/{taskId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // Categories collection
+    match /categories/{userId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // Preferences collection
+    match /preferences/{userId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+  }
+} 

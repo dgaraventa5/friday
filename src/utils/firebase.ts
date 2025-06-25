@@ -1,5 +1,5 @@
 // Firebase configuration and authentication services
-import { initializeApp } from 'firebase/app';
+import { initializeApp, FirebaseApp } from 'firebase/app';
 import {
   getAuth,
   GoogleAuthProvider,
@@ -7,6 +7,7 @@ import {
   signOut,
   onAuthStateChanged,
   User,
+  Auth,
 } from 'firebase/auth';
 
 // Debug: Log environment variables
@@ -89,14 +90,28 @@ console.log('Firebase config being used:', {
 });
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+let app: FirebaseApp;
+let auth: Auth;
+let googleProvider: GoogleAuthProvider;
 
-// Configure Google provider for enhanced security
-googleProvider.setCustomParameters({
-  prompt: 'select_account',
-});
+try {
+  console.log('[Firebase] Initializing Firebase app with config');
+  app = initializeApp(firebaseConfig);
+  console.log('[Firebase] Firebase app initialized successfully');
+  auth = getAuth(app);
+  console.log('[Firebase] Firebase auth initialized');
+  googleProvider = new GoogleAuthProvider();
+
+  // Configure Google provider for enhanced security
+  googleProvider.setCustomParameters({
+    prompt: 'select_account',
+  });
+
+  console.log('[Firebase] Firebase setup complete');
+} catch (error) {
+  console.error('[Firebase] Error initializing Firebase:', error);
+  throw error;
+}
 
 // Sign in with Google popup
 export const signInWithGoogle = async () => {
@@ -148,4 +163,4 @@ export const resetUserData = (userId: string): void => {
   window.location.reload();
 };
 
-export { auth };
+export { auth, app };

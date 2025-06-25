@@ -2,6 +2,7 @@ import { Task } from '../types/task';
 import { TaskCard } from './TaskCard';
 import { format, isBefore } from 'date-fns';
 import { getDateKey, normalizeDate, getTodayKey } from '../utils/dateUtils';
+import { PageLayout } from './PageLayout';
 
 interface SchedulePageProps {
   tasks: Task[];
@@ -49,18 +50,22 @@ export function SchedulePage({
     .sort();
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-neutral-900 mb-4 font-sans flex items-center gap-2">
-        <span role="img" aria-label="calendar">
+    <PageLayout allowScroll={true}>
+      <div className="flex items-center gap-2 mb-4">
+        <span role="img" aria-label="calendar" className="text-2xl">
           🗓️
-        </span>{' '}
-        Full Task Schedule
-      </h1>
+        </span>
+        <h1 className="text-2xl font-bold text-neutral-900 font-sans">
+          Full Task Schedule
+        </h1>
+      </div>
+
       {sortedDates.length === 0 && (
         <div className="text-center py-12 text-neutral-600 font-sans">
           No scheduled tasks yet.
         </div>
       )}
+
       {sortedDates.map((dateKey) => {
         // Create a date object directly from the local date string
         // Add T00:00:00 to ensure it's parsed as local time
@@ -79,7 +84,7 @@ export function SchedulePage({
         return (
           <div
             key={dateKey}
-            className="bg-white rounded-2xl shadow-card p-4 md:p-6"
+            className="bg-white rounded-2xl shadow-card p-4 md:p-6 mb-4"
           >
             <h2 className="text-lg font-bold text-neutral-800 mb-2 font-sans">
               {format(dateObj, 'EEE MMM d yyyy')}
@@ -98,6 +103,6 @@ export function SchedulePage({
           </div>
         );
       })}
-    </div>
+    </PageLayout>
   );
 }

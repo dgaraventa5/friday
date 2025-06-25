@@ -254,7 +254,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Overlay for loading state */}
       <LoadingOverlay show={ui.isLoading} message="Loading your tasks..." />
 
@@ -273,15 +273,15 @@ function AppContent() {
         />
       </ErrorBoundary>
 
-      <main className="mx-auto px-2 py-4 w-full max-w-[600px] md:px-6 md:py-8 lg:max-w-[900px]">
-        <div className="w-full flex flex-col">
+      <main className="flex-1 mx-auto px-2 py-4 w-full max-w-[600px] md:px-6 md:py-8 lg:max-w-[900px] overflow-hidden">
+        <div className="w-full h-full flex flex-col">
           {/* Main content: task list/cards, now full width on large screens */}
-          <div className="w-full max-w-[600px] lg:max-w-[900px] mx-auto">
+          <div className="w-full max-w-[600px] lg:max-w-[900px] mx-auto h-full">
             {/* Show welcome message if onboarding not complete */}
             <ErrorBoundary>
               {!onboarding_complete && <WelcomeMessage />}
             </ErrorBoundary>
-            <div className="mt-8 space-y-8">
+            <div className="mt-4 space-y-4 h-full">
               {/* Main task list (today's focus or full schedule) */}
               <ErrorBoundary>
                 <TaskErrorBoundary>
