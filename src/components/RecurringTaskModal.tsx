@@ -18,16 +18,16 @@ export function RecurringTaskModal({
   onClose,
 }: RecurringTaskModalProps) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
       <div
-        className="bg-white rounded-lg shadow-xl max-w-md w-full p-4 animate-slide-up overflow-hidden"
+        className="bg-white rounded-lg shadow-md max-w-xs w-full p-3 animate-slide-up overflow-hidden mx-4"
         style={{
           maxHeight: 'calc(100vh - 48px)',
           height: 'auto',
         }}
       >
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xl font-bold text-neutral-900 font-sans">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-base font-bold text-neutral-900 font-sans">
             Task Rescheduled
           </h3>
           <button
@@ -35,27 +35,30 @@ export function RecurringTaskModal({
             className="text-neutral-500 hover:text-neutral-700 transition-colors"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <p className="mb-3 text-sm text-neutral-800 font-sans">
+        <p className="mb-2 text-xs text-neutral-800 font-sans">
           You completed "
           <span className="font-medium">{completedTask.name}</span>"
         </p>
 
-        <div className="bg-green-50 border border-green-100 rounded-md p-3 mb-4">
+        <div className="bg-green-50 border border-green-100 rounded-md p-2 mb-3">
           <p className="text-xs text-green-800 font-sans">
-            Since this is a recurring task, a new instance has been created for{' '}
+            A new instance has been created for{' '}
             <span className="font-medium">
               {formatTaskDate(nextTask.dueDate)}
             </span>
-            .
           </p>
         </div>
 
         <div className="flex justify-end">
-          <Button variant="primary" onClick={onClose} className="py-2 text-sm">
+          <Button
+            variant="primary"
+            onClick={onClose}
+            className="py-1 px-3 text-xs"
+          >
             Got it
           </Button>
         </div>

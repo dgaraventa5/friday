@@ -361,13 +361,11 @@ function AppContent() {
 
       {/* Recurring task modal */}
       {recurringModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <RecurringTaskModal
-            completedTask={recurringModal.completedTask}
-            nextTask={recurringModal.nextTask}
-            onClose={() => setRecurringModal(null)}
-          />
-        </div>
+        <RecurringTaskModal
+          completedTask={recurringModal.completedTask}
+          nextTask={recurringModal.nextTask}
+          onClose={() => setRecurringModal(null)}
+        />
       )}
 
       {/* Settings modal */}
