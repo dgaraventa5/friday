@@ -24,6 +24,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { DevTools } from './components/DevTools';
 import { Button } from './components/Button';
 import { getTodayKey, getDateKey } from './utils/dateUtils';
+import { X } from 'lucide-react';
 
 // Helper to get a string key for today (YYYY-MM-DD) - DEPRECATED, use getTodayKey from dateUtils
 // function getTodayKey() {
@@ -317,13 +318,13 @@ function AppContent() {
 
       {/* Task input modal */}
       {isTaskInputExpanded && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-40">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
           <div
             ref={modalRef}
-            className="bg-white rounded-t-xl w-full max-w-lg p-4 pb-8 animate-slide-up"
+            className="bg-white rounded-xl w-full max-w-lg p-4 animate-slide-up overflow-hidden"
             style={{
-              maxHeight: '80vh',
-              paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 2rem)',
+              maxHeight: 'calc(100vh - 48px)',
+              height: 'auto',
             }}
           >
             <TaskInput
@@ -338,13 +339,13 @@ function AppContent() {
 
       {/* Edit task modal */}
       {editingTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-40">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
           <div
             ref={modalRef}
-            className="bg-white rounded-t-xl w-full max-w-lg p-4 pb-8 animate-slide-up"
+            className="bg-white rounded-xl w-full max-w-lg p-4 animate-slide-up overflow-hidden"
             style={{
-              maxHeight: '80vh',
-              paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 2rem)',
+              maxHeight: 'calc(100vh - 48px)',
+              height: 'auto',
             }}
           >
             <EditTaskModal
@@ -373,47 +374,34 @@ function AppContent() {
       {showSettings && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div
-            className="bg-white rounded-xl w-full max-w-lg p-6 animate-fade-in"
+            className="bg-white rounded-xl w-full max-w-lg p-4 animate-fade-in overflow-hidden"
             style={{
-              maxHeight: '80vh',
-              overflowY: 'auto',
+              maxHeight: 'calc(100vh - 48px)',
+              height: 'auto',
             }}
           >
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-2">
               <h2 className="text-xl font-bold">Settings</h2>
               <button
                 onClick={() => setShowSettings(false)}
                 className="p-2 text-neutral-600 hover:text-neutral-900 rounded-full"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 overflow-y-auto">
               {/* Settings content will go here */}
               <p className="text-neutral-600">
                 Settings options will be added here.
               </p>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-4">
               <Button
                 onClick={() => setShowSettings(false)}
                 variant="primary"
-                className="w-full"
+                className="w-full py-2 text-sm"
               >
                 Close
               </Button>
