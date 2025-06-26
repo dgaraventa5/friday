@@ -319,9 +319,6 @@ function AppContent() {
           todayTasksCompleted={
             todayFocusTasks.filter((t) => t.completed).length
           }
-          onProcessRecurring={() =>
-            dispatch({ type: 'PROCESS_RECURRING_TASKS' })
-          }
         />
       </ErrorBoundary>
 

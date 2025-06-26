@@ -1,10 +1,9 @@
 // Header.tsx
 // App header: shows app name, date, progress circle for Today's Focus, and settings button.
 
-import { Calendar, RefreshCw, User } from 'lucide-react';
-import { format } from 'date-fns';
+import { User } from 'lucide-react';
 import { ProgressCircle } from './ProgressCircle';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserProfile } from './UserProfile';
 
@@ -13,84 +12,120 @@ interface HeaderProps {
   todayTaskCount: number;
   totalTaskCount: number;
   todayTasksCompleted: number;
-  onProcessRecurring?: () => void;
 }
 
-export function Header({ 
+export function Header({
   onOpenSettings,
   todayTaskCount,
   todayTasksCompleted,
-  onProcessRecurring
 }: HeaderProps) {
-  // Get today's date and day name
-  const today = new Date();
-  const dayName = format(today, 'EEEE');
-  const dateStr = format(today, 'MMMM d, yyyy');
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const { authState } = useAuth();
   const { user } = authState;
 
+  useEffect(() => {
+    if (user) {
+      console.log('User info in Header:', {
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        email: user.email?.substring(0, 5) + '...', // Only log part of the email for privacy
+      });
+    }
+  }, [user]);
+
+  const iconSize = 36;
+
   return (
     <header
-      className="bg-white border-b border-neutral-50 px-4 md:px-6 py-4 font-sans"
+      className="bg-white border-b border-neutral-50 font-sans"
       style={{
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        paddingLeft: 'env(safe-area-inset-left, 0px)',
-        paddingRight: 'env(safe-area-inset-right, 0px)',
+        height: '60px',
+        padding: '6px',
+        paddingTop: 'max(6px, env(safe-area-inset-top, 6px))',
+        paddingLeft: 'max(6px, env(safe-area-inset-left, 6px))',
+        paddingRight: 'max(6px, env(safe-area-inset-right, 6px))',
       }}
     >
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between">
-          {/* App name and date */}
-          <div>
-            <h1 className="text-2xl font-bold text-neutral-900 mb-1 font-sans">
-              Friday
-            </h1>
-            <div className="flex items-center gap-2 text-neutral-600 font-sans">
-              <Calendar className="w-4 h-4" />
-              <span className="text-sm font-medium">{dayName}</span>
-              <span className="text-sm text-neutral-500">{dateStr}</span>
-            </div>
+      <div className="max-w-4xl mx-auto h-full">
+        <div className="flex items-center justify-between h-full">
+          {/* App logo */}
+          <div className="flex items-center">
+            <svg
+              width={iconSize}
+              height={iconSize}
+              viewBox="0 0 200 200"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle cx="100" cy="100" r="65" fill="#FFB800" />
+              <path d="M100 0L110 40L100 30L90 40Z" fill="#FFB800" />
+              <path d="M100 200L110 160L100 170L90 160Z" fill="#FFB800" />
+              <path d="M0 100L40 110L30 100L40 90Z" fill="#FFB800" />
+              <path d="M200 100L160 110L170 100L160 90Z" fill="#FFB800" />
+              <path
+                d="M29.3 29.3L58.6 58.6L48.5 48.5L58.6 48.5Z"
+                fill="#FFB800"
+              />
+              <path
+                d="M170.7 170.7L141.4 141.4L151.5 151.5L141.4 151.5Z"
+                fill="#FFB800"
+              />
+              <path
+                d="M29.3 170.7L58.6 141.4L48.5 151.5L58.6 151.5Z"
+                fill="#FFB800"
+              />
+              <path
+                d="M170.7 29.3L141.4 58.6L151.5 48.5L141.4 48.5Z"
+                fill="#FFB800"
+              />
+            </svg>
           </div>
 
           {/* Progress circle and user profile */}
-          <div className="flex items-center gap-6">
-            {/* Progress Circle for Today's Focus */}
-            <div className="flex flex-col items-center">
-              {/* Shows percent of today's focus tasks completed */}
-              <ProgressCircle completed={todayTasksCompleted} total={todayTaskCount || 1} size={48} />
-              <span className="text-xs text-neutral-500 mt-1 font-sans">Today's Focus</span>
+          <div className="flex items-center gap-4">
+            {/* Progress Circle */}
+            <div className="flex items-center">
+              <ProgressCircle
+                completed={todayTasksCompleted}
+                total={todayTaskCount || 1}
+                size={iconSize}
+              />
             </div>
-            
-            {/* Process recurring tasks button (for testing) */}
-            {onProcessRecurring && (
-              <button
-                onClick={onProcessRecurring}
-                className="w-10 h-10 flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors duration-200 font-sans"
-                title="Process Recurring Tasks"
-              >
-                <RefreshCw className="w-6 h-6" />
-              </button>
-            )}
 
             {/* User profile button */}
             <div className="relative">
               <button
                 onClick={() => setShowUserProfile(!showUserProfile)}
-                className="w-10 h-10 flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors duration-200 font-sans"
+                className={`flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors duration-200 font-sans`}
                 title="User Profile"
+                style={{ width: iconSize, height: iconSize }}
               >
-                {user?.photoURL ? (
-                  <img 
-                    src={user.photoURL} 
-                    alt={user.displayName || 'User'} 
-                    className="w-7 h-7 rounded-full"
+                {user?.photoURL && !imageError ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName || 'User'}
+                    className="rounded-full"
+                    style={{ width: iconSize - 12, height: iconSize - 12 }}
+                    onError={() => {
+                      console.error(
+                        'Failed to load user profile image:',
+                        user.photoURL,
+                      );
+                      setImageError(true);
+                    }}
                   />
                 ) : (
-                  <User className="w-6 h-6" />
+                  <div
+                    className="rounded-full bg-blue-500 flex items-center justify-center text-white"
+                    style={{ width: iconSize - 12, height: iconSize - 12 }}
+                  >
+                    {user?.displayName?.charAt(0) || user?.email?.charAt(0) || (
+                      <User className="w-6 h-6" />
+                    )}
+                  </div>
                 )}
               </button>
-              
+
               {/* User profile dropdown */}
               {showUserProfile && (
                 <div className="absolute right-0 mt-2 z-10 w-64">
