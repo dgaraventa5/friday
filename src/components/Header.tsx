@@ -34,11 +34,12 @@ export function Header({
     }
   }, [user]);
 
-  const iconSize = 36;
+  const iconSize = 40;
+  const sunIconSize = 36;
 
   return (
     <header
-      className="bg-white border-b border-neutral-50 font-sans"
+      className="bg-white border-b border-neutral-50"
       style={{
         height: '60px',
         padding: '6px',
@@ -52,8 +53,8 @@ export function Header({
           {/* App logo */}
           <div className="flex items-center">
             <svg
-              width={iconSize}
-              height={iconSize}
+              width={sunIconSize}
+              height={sunIconSize}
               viewBox="0 0 200 200"
               xmlns="http://www.w3.org/2000/svg"
             >
@@ -96,7 +97,7 @@ export function Header({
             <div className="relative">
               <button
                 onClick={() => setShowUserProfile(!showUserProfile)}
-                className={`flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors duration-200 font-sans`}
+                className={`flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors duration-200`}
                 title="User Profile"
                 style={{ width: iconSize, height: iconSize }}
               >

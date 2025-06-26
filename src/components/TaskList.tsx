@@ -72,13 +72,13 @@ export function TaskList({
     return (
       <PageLayout>
         <div className="flex flex-col items-center justify-center h-full">
-          <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-4 font-sans">
+          <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-4 ">
             <CheckCircle2 className="w-8 h-8 text-neutral-600" />
           </div>
-          <h3 className="text-lg font-medium text-neutral-900 mb-2 font-sans">
+          <h3 className="text-lg font-medium text-neutral-900 mb-2 ">
             No tasks yet
           </h3>
-          <p className="text-neutral-600 font-sans">
+          <p className="text-neutral-600 ">
             Add your first task to get started with focused productivity.
           </p>
         </div>
@@ -91,22 +91,22 @@ export function TaskList({
     return (
       <PageLayout>
         <div className="flex flex-col items-center justify-center h-full">
-          <div className="w-20 h-20 bg-success-500/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce-gentle font-sans">
+          <div className="w-20 h-20 bg-success-500/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce-gentle ">
             <Sparkles className="w-10 h-10 text-success-500" />
           </div>
-          <h3 className="text-xl font-bold text-neutral-900 mb-2 font-sans">
+          <h3 className="text-xl font-bold text-neutral-900 mb-2 ">
             All done! 🎉
           </h3>
-          <p className="text-base text-neutral-600 mb-3 font-sans">
+          <p className="text-base text-neutral-600 mb-3 ">
             You've completed all your tasks for today.
           </p>
-          <div className="bg-gradient-to-r from-success-500/10 to-primary-100 rounded-lg p-3 max-w-md mx-auto font-sans">
-            <p className="text-sm text-neutral-600 italic font-sans">
+          <div className="bg-gradient-to-r from-success-500/10 to-primary-100 rounded-lg p-3 max-w-md mx-auto ">
+            <p className="text-sm text-neutral-600 italic ">
               "The secret of getting ahead is getting started. The secret of
               getting started is breaking your complex overwhelming tasks into
               small manageable tasks."
             </p>
-            <p className="text-xs text-neutral-500 mt-2 font-sans">
+            <p className="text-xs text-neutral-500 mt-2 ">
               — Mark Twain
             </p>
           </div>
@@ -118,7 +118,7 @@ export function TaskList({
   return (
     <PageLayout>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-neutral-900 font-sans">
+        <h2 className="text-xl font-bold text-neutral-900 ">
           {formattedDateWithOrdinal}
         </h2>
       </div>
@@ -155,7 +155,7 @@ export function TaskList({
             {/* Completed Tasks (Full Schedule) */}
             {completedTasks.length > 0 && (
               <div className="mt-6">
-                <h3 className="text-lg font-semibold text-neutral-600 mb-3 font-sans">
+                <h3 className="text-lg font-semibold text-neutral-600 mb-3 ">
                   completed ({completedTasks.length})
                 </h3>
                 <div className="space-y-3 opacity-75">

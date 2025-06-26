@@ -10,7 +10,7 @@ interface BottomNavProps {
 export function BottomNav({ onToday, onAdd, onSchedule, currentPage = 'today' }: BottomNavProps) {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-neutral-100 flex justify-around items-center h-16 px-2 shadow-card font-sans"
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-neutral-100 flex justify-around items-center h-16 px-2 shadow-card "
       style={{
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         paddingLeft: 'env(safe-area-inset-left, 0px)',

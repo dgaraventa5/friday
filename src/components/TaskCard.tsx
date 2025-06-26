@@ -49,7 +49,7 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
 
   return (
     <div
-      className={`bg-white rounded-lg border p-4 shadow-card transition-all duration-600 hover:shadow-card-hover hover:scale-[1.015] font-sans cursor-pointer
+      className={`bg-white rounded-lg border p-4 shadow-card transition-all duration-600 hover:shadow-card-hover hover:scale-[1.015]  cursor-pointer
         ${task.completed ? 'border-success-500 bg-success-50/30 opacity-60 translate-y-2' : isOverdue ? 'border-warning-500 bg-warning-50/20' : 'border-neutral-100'}
       `}
       onClick={handleCardClick}
@@ -77,7 +77,7 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
           <div className="flex items-center justify-between mb-2">
             {/* Task Name (strikethrough if completed) */}
             <h3
-              className={`text-lg font-semibold font-sans ${
+              className={`text-lg font-semibold  ${
                 task.completed
                   ? 'text-neutral-600 line-through'
                   : 'text-neutral-900'

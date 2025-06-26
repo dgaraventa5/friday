@@ -55,13 +55,13 @@ export function SchedulePage({
         <span role="img" aria-label="calendar" className="text-2xl">
           🗓️
         </span>
-        <h1 className="text-2xl font-bold text-neutral-900 font-sans">
+        <h1 className="text-2xl font-bold text-neutral-900 ">
           Full Task Schedule
         </h1>
       </div>
 
       {sortedDates.length === 0 && (
-        <div className="text-center py-12 text-neutral-600 font-sans">
+        <div className="text-center py-12 text-neutral-600 ">
           No scheduled tasks yet.
         </div>
       )}
@@ -86,7 +86,7 @@ export function SchedulePage({
             key={dateKey}
             className="bg-white rounded-2xl shadow-card p-4 md:p-6 mb-4"
           >
-            <h2 className="text-lg font-bold text-neutral-800 mb-2 font-sans">
+            <h2 className="text-lg font-bold text-neutral-800 mb-2 ">
               {format(dateObj, 'EEE MMM d yyyy')}
             </h2>
             <div className="space-y-2">

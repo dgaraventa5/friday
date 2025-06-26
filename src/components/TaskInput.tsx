@@ -122,7 +122,7 @@ export function TaskInput({
     return (
       <button
         onClick={onCancel}
-        className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-neutral-50 rounded-lg text-neutral-600 hover:border-primary-500 hover:text-primary-600 transition-all duration-200 group font-sans"
+        className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-neutral-50 rounded-lg text-neutral-600 hover:border-primary-500 hover:text-primary-600 transition-all duration-200 group"
       >
         <Plus className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
         <span className="font-medium">Add a task</span>
@@ -132,12 +132,10 @@ export function TaskInput({
 
   // Render the add task form
   return (
-    <div className="bg-[#f7f7f7] rounded-lg border border-neutral-50 shadow-card p-4 animate-slide-up font-sans max-h-[calc(100vh-48px)] overflow-y-auto">
+    <div className="bg-[#f7f7f7] rounded-lg border border-neutral-50 shadow-card p-4 animate-slide-up max-h-[calc(100vh-48px)] overflow-y-auto">
       <form onSubmit={handleSubmit} className="space-y-3 w-full">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xl font-bold text-neutral-900 font-sans">
-            Add New Task
-          </h3>
+          <h3 className="text-xl font-bold text-neutral-900">Add New Task</h3>
           <Button
             type="button"
             onClick={handleCancel}
@@ -257,7 +255,7 @@ export function TaskInput({
             }
             className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
           />
-          <span className="text-sm text-neutral-900 font-sans text-left">
+          <span className="text-sm text-neutral-900  text-left">
             This is a recurring task
           </span>
         </label>
@@ -286,7 +284,7 @@ export function TaskInput({
             {/* Weekly Recurring Days */}
             {task.recurringInterval === 'weekly' && (
               <div>
-                <label className="block text-sm font-medium text-neutral-600 mb-1 font-sans">
+                <label className="block text-sm font-medium text-neutral-600 mb-1 ">
                   Recurring Days
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -305,7 +303,7 @@ export function TaskInput({
                           }}
                           className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
                         />
-                        <span className="ml-1 text-xs text-neutral-600 font-sans">
+                        <span className="ml-1 text-xs text-neutral-600 ">
                           {day}
                         </span>
                       </label>
@@ -322,7 +320,7 @@ export function TaskInput({
 
             {/* End Repeat Options */}
             <div>
-              <label className="block text-sm font-medium text-neutral-600 mb-1 font-sans">
+              <label className="block text-sm font-medium text-neutral-600 mb-1 ">
                 End Repeat
               </label>
               <div className="space-y-1">
@@ -334,7 +332,7 @@ export function TaskInput({
                     onChange={() => handleChange('recurringEndType', 'never')}
                     className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
                   />
-                  <span className="ml-2 text-xs text-neutral-600 font-sans">
+                  <span className="ml-2 text-xs text-neutral-600 ">
                     Never
                   </span>
                 </label>
@@ -348,7 +346,7 @@ export function TaskInput({
                       onChange={() => handleChange('recurringEndType', 'after')}
                       className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
                     />
-                    <span className="ml-2 text-xs text-neutral-600 font-sans">
+                    <span className="ml-2 text-xs text-neutral-600 ">
                       After
                     </span>
                   </label>
@@ -368,7 +366,7 @@ export function TaskInput({
                     disabled={task.recurringEndType !== 'after'}
                     className="ml-2 w-12 h-6 border border-neutral-300 rounded text-xs px-2"
                   />
-                  <span className="ml-1 text-xs text-neutral-600 font-sans">
+                  <span className="ml-1 text-xs text-neutral-600 ">
                     time(s)
                   </span>
                 </div>

@@ -8,7 +8,7 @@
 
 ## 1. Design Principles
 
-1. **Fast‐First** – every visible action should respond (<100 ms) or show
+1. **Fast‐First** – every visible action should respond (<100 ms) or show
    instant feedback (skeleton, shimmer).
    ([uxdesign.cc](https://uxdesign.cc/so-youre-building-a-superhuman-of-x-b39015f3d7a6))
 2. **Clarity Over Clutter** – single, obvious next action on each screen;
@@ -16,10 +16,10 @@
 3. **Consistency** – one design system, one set of tokens (color, type, spacing)
    applied everywhere for instant "brand recall."
    ([addictaco.com](https://addictaco.com/case-study-how-airbnbs-design-system-improved-their-ux/))
-4. **Accessibility by Default** – WCAG AA contrast, min 44 pt × 44 pt touch
+4. **Accessibility by Default** – WCAG AA contrast, min 44 pt × 44 pt touch
    targets, focus rings, and semantic HTML.
    ([developer.apple.com](https://developer.apple.com/design/tips/))
-5. **Delight in Micro‑moments** – subtle motion (150‑300 ms ease‑out) that
+5. **Delight in Micro‑moments** – subtle motion (150‑300 ms ease‑out) that
    guides, not distracts. (Apple HIG Motion)
 
 ---
@@ -35,13 +35,13 @@
 | **Success**     | `#16A34A` | Completed tasks              |
 | **Warning**     | `#D97706` | Deadlines & errors           |
 
-- **Typography:** Inter (or system UI fallback) –
+- **Typography:** Aleo (or system UI fallback) –
 
   - Display xl 32/40 px ‑ headline pages
   - Heading md 20/28 px
   - Body base 16/24 px
 
-- **Grid & Spacing:** 4‑pt base (4, 8, 12, 16 …). Cards: 16 px inner padding, 8
+- **Grid & Spacing:** 4‑pt base (4, 8, 12, 16 …). Cards: 16 px inner padding, 8
   px corner radius, `shadow-sm`.
 
 ---

@@ -26,7 +26,7 @@ export function RecurringTaskModal({
         }}
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-neutral-900 font-sans">
+          <h3 className="text-sm font-bold text-neutral-900 ">
             Task Rescheduled
           </h3>
           <button
@@ -39,7 +39,7 @@ export function RecurringTaskModal({
         </div>
 
         <div className="bg-green-50 border border-green-100 rounded p-1.5 my-1.5">
-          <p className="text-xs text-green-800 font-sans leading-tight">
+          <p className="text-xs text-green-800  leading-tight">
             <span className="font-medium">{completedTask.name}</span> completed.
             <br />
             Next:{' '}

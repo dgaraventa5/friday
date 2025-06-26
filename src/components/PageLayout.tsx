@@ -20,9 +20,7 @@ export function PageLayout({
   return (
     <div className={allowScroll ? 'schedule-page' : 'viewport-height'}>
       {title && (
-        <h1 className="text-2xl font-bold text-neutral-900 mb-4 font-sans">
-          {title}
-        </h1>
+        <h1 className="text-2xl font-bold text-neutral-900 mb-4">{title}</h1>
       )}
       {children}
     </div>

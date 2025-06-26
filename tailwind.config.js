@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        'sans': ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Aleo', 'system-ui', 'sans-serif'],
       },
       colors: {
         primary: { 100: '#E0ECFF', 500: '#2563EB', 600: '#1E4ED8' },
