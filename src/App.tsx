@@ -2,7 +2,7 @@
 // Main entry point for the Friday app UI. Handles global layout, state, and sticky Today's Focus logic.
 
 import { AppProvider, useApp } from './context/AppContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
 import { TaskList } from './components/TaskList';
 import { TaskInput } from './components/TaskInput';
@@ -50,6 +50,7 @@ function AppContent() {
     return stored ? JSON.parse(stored) : [];
   });
   const [showSettings, setShowSettings] = useState(false);
+  const { authState } = useAuth();
 
   // Update completedFocusIds when a task is completed
   useEffect(() => {
@@ -166,6 +167,14 @@ function AppContent() {
     if (!onboarding_complete) {
       console.log('Setting onboarding complete after first task added');
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
+
+      // Also directly update localStorage
+      const { user } = authState;
+      if (user) {
+        const userPrefix = `user_${user.uid}_`;
+        localStorage.setItem(`${userPrefix}onboarding_complete`, 'true');
+        console.log('Directly updated localStorage onboarding status to true');
+      }
     }
   };
 
@@ -256,7 +265,40 @@ function AppContent() {
   // Log onboarding status whenever it changes
   useEffect(() => {
     console.log('Onboarding complete status changed:', onboarding_complete);
-  }, [onboarding_complete]);
+
+    // Check the localStorage directly
+    const { user } = authState;
+    if (user) {
+      const userPrefix = `user_${user.uid}_`;
+      const localStorageValue = localStorage.getItem(
+        `${userPrefix}onboarding_complete`,
+      );
+      console.log('LocalStorage onboarding status:', localStorageValue);
+
+      // Force update localStorage if it doesn't match the current state
+      if (onboarding_complete && localStorageValue !== 'true') {
+        console.log('Forcing localStorage update for onboarding status');
+        localStorage.setItem(`${userPrefix}onboarding_complete`, 'true');
+      }
+    }
+  }, [onboarding_complete, authState]);
+
+  // Check if there are tasks and force set onboarding status
+  useEffect(() => {
+    if (tasks.length > 0 && !onboarding_complete) {
+      console.log(
+        'Tasks exist but onboarding not complete. Forcing onboarding complete.',
+      );
+      dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
+
+      // Also directly update localStorage
+      const { user } = authState;
+      if (user) {
+        const userPrefix = `user_${user.uid}_`;
+        localStorage.setItem(`${userPrefix}onboarding_complete`, 'true');
+      }
+    }
+  }, [tasks, onboarding_complete, authState, dispatch]);
 
   // Add a handler for opening settings
   const handleOpenSettings = () => {
@@ -287,9 +329,9 @@ function AppContent() {
         <div className="w-full h-full flex flex-col">
           {/* Main content: task list/cards, now full width on large screens */}
           <div className="w-full max-w-[600px] lg:max-w-[900px] mx-auto h-full">
-            {/* Show welcome message if onboarding not complete */}
+            {/* Show welcome message if onboarding not complete AND no tasks exist */}
             <ErrorBoundary>
-              {!onboarding_complete && <WelcomeMessage />}
+              {!onboarding_complete && tasks.length === 0 && <WelcomeMessage />}
             </ErrorBoundary>
             <div className="mt-4 space-y-4 h-full">
               {/* Main task list (today's focus or full schedule) */}
