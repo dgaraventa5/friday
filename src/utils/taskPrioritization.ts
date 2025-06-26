@@ -262,6 +262,19 @@ export function assignStartDates(
     // Calculate remaining capacity for this day
     const remainingCapacity = Math.max(0, maxPerDay - recurringTasksCount);
 
+    // Skip to next day if no capacity left after recurring tasks
+    if (remainingCapacity <= 0) {
+      console.log(
+        `Day ${dayOffset}: Skipping - ${recurringTasksCount} recurring tasks already at or exceeding max (${maxPerDay})`,
+      );
+      dayOffset++;
+      continue;
+    }
+
+    console.log(
+      `Day ${dayOffset}: ${recurringTasksCount} recurring tasks, ${remainingCapacity} slots remaining (max: ${maxPerDay})`,
+    );
+
     const currentBucket: typeof scoredNonRecurring = [];
     const categoryHours: Record<string, number> = {};
     let totalTasks = 0;
@@ -299,6 +312,10 @@ export function assignStartDates(
       }
     }
 
+    console.log(
+      `Day ${dayOffset} final: ${recurringTasksCount + currentBucket.length} total tasks assigned`,
+    );
+
     // Any remaining unassigned tasks go to the next day
     const nextDayTasks = [...unassigned];
     // If nothing could be scheduled for a non-weekend day, break to avoid infinite loop
@@ -330,6 +347,29 @@ export function assignStartDates(
     ...recurringAssignments, // Recurring tasks assigned to their specific days
     ...completedTasks, // Completed tasks
   ];
+
+  // Verify that no day exceeds the maxPerDay limit
+  const tasksByDay = new Map<string, Task[]>();
+
+  // Group tasks by date
+  result.forEach((task) => {
+    if (task.startDate && !task.completed) {
+      const dateKey = getDateKey(task.startDate);
+      if (!tasksByDay.has(dateKey)) {
+        tasksByDay.set(dateKey, []);
+      }
+      tasksByDay.get(dateKey)!.push(task);
+    }
+  });
+
+  // Check for any days exceeding the limit
+  tasksByDay.forEach((tasksForDay, dateKey) => {
+    if (tasksForDay.length > maxPerDay) {
+      console.warn(
+        `Warning: ${dateKey} has ${tasksForDay.length} tasks (exceeds max ${maxPerDay})`,
+      );
+    }
+  });
 
   console.log(
     'Task prioritization - Assigned tasks with normalized dates:',
