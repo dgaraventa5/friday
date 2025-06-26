@@ -116,7 +116,7 @@ function AppContent() {
     return taskDateString === todayDateString;
   });
 
-  // Debug log for progress circle
+  // Debug logging for progress circle
   console.log("Today's Focus Tasks:", todayFocusTasks);
   console.log(
     "Today's Focus Completed:",
@@ -125,6 +125,7 @@ function AppContent() {
     todayFocusTasks.length,
   );
   console.log("Today's date string for comparison:", todayDateString);
+  console.log('Onboarding complete status:', onboarding_complete);
   console.log(
     'Task startDate strings:',
     assignedTasks.map((t) => ({
@@ -160,7 +161,10 @@ function AppContent() {
   const handleAddTask = (task: Task) => {
     dispatch({ type: 'ADD_TASK', payload: task });
     setIsTaskInputExpanded(false);
+
+    // Set onboarding complete when first task is added
     if (!onboarding_complete) {
+      console.log('Setting onboarding complete after first task added');
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
     }
   };
@@ -248,6 +252,11 @@ function AppContent() {
   useEffect(() => {
     console.log('isTaskInputExpanded:', isTaskInputExpanded);
   }, [isTaskInputExpanded]);
+
+  // Log onboarding status whenever it changes
+  useEffect(() => {
+    console.log('Onboarding complete status changed:', onboarding_complete);
+  }, [onboarding_complete]);
 
   // Add a handler for opening settings
   const handleOpenSettings = () => {

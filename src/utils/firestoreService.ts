@@ -393,10 +393,15 @@ export async function saveOnboardingStatusToFirestore(
         `user_${userId}_onboarding_complete`,
         String(completed),
       );
+      console.log(
+        `[Firestore] Saved onboarding status to localStorage: ${completed}`,
+      );
       return;
     }
 
-    console.log(`[Firestore] Saving onboarding status for user: ${userId}`);
+    console.log(
+      `[Firestore] Saving onboarding status for user: ${userId}, value: ${completed}`,
+    );
     const userPreferencesRef = doc(db, COLLECTIONS.PREFERENCES, userId);
     await setDoc(
       userPreferencesRef,
@@ -406,12 +411,17 @@ export async function saveOnboardingStatusToFirestore(
       },
       { merge: true },
     );
-    console.log('[Firestore] Onboarding status saved successfully');
+    console.log(
+      '[Firestore] Onboarding status saved successfully to Firestore',
+    );
 
     // Also save to localStorage as backup
     localStorage.setItem(
       `user_${userId}_onboarding_complete`,
       String(completed),
+    );
+    console.log(
+      `[Firestore] Also saved onboarding status to localStorage: ${completed}`,
     );
   } catch (error) {
     console.error('Error saving onboarding status to Firestore:', error);
@@ -420,6 +430,9 @@ export async function saveOnboardingStatusToFirestore(
     localStorage.setItem(
       `user_${userId}_onboarding_complete`,
       String(completed),
+    );
+    console.log(
+      `[Firestore] Fallback saved onboarding status to localStorage: ${completed}`,
     );
   }
 }

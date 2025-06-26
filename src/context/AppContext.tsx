@@ -165,6 +165,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ui: { ...state.ui, error: action.payload },
       };
     case 'SET_ONBOARDING_COMPLETE':
+      console.log(
+        `[AppContext] Setting onboarding_complete to: ${action.payload}`,
+      );
       return { ...state, onboarding_complete: action.payload };
     case 'PROCESS_RECURRING_TASKS': {
       const processedTasks = processRecurringTasks(state.tasks);
