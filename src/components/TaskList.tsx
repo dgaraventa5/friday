@@ -12,7 +12,6 @@ interface TaskListProps {
   tasks: Task[];
   onToggleComplete: (taskId: string) => void;
   onEdit?: (task: Task) => void;
-  title?: string;
   showCompletionCelebration?: boolean;
   showCompletedInline?: boolean; // If true, show completed/incomplete together (Today's Focus)
 }
@@ -21,7 +20,6 @@ export function TaskList({
   tasks,
   onToggleComplete,
   onEdit,
-  title = "Today's Tasks",
   showCompletionCelebration = false,
   showCompletedInline = false,
 }: TaskListProps) {
@@ -30,6 +28,24 @@ export function TaskList({
 
   // Get today's date as a string in YYYY-MM-DD format for comparison
   const todayDateString = getTodayKey();
+
+  // Format current date for display (lowercase)
+  const formattedDate = new Date()
+    .toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    .toLowerCase();
+
+  // Add ordinal suffix to day
+  const formattedDateWithOrdinal = formattedDate.replace(/(\d+)/, (match) => {
+    const num = parseInt(match);
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const v = num % 100;
+    return num + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
+  });
 
   // Only show completed tasks for today in full schedule mode
   const completedTasks = showCompletedInline
@@ -103,7 +119,7 @@ export function TaskList({
     <PageLayout>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-neutral-900 font-sans">
-          {title}
+          {formattedDateWithOrdinal}
         </h2>
       </div>
 
@@ -140,7 +156,7 @@ export function TaskList({
             {completedTasks.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-lg font-semibold text-neutral-600 mb-3 font-sans">
-                  Completed ({completedTasks.length})
+                  completed ({completedTasks.length})
                 </h3>
                 <div className="space-y-3 opacity-75">
                   {completedTasks.map((task) => (
