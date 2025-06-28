@@ -17,28 +17,6 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
   const isOverdue = isPast(task.dueDate) && !isToday(task.dueDate);
   const isDueToday = isToday(task.dueDate);
 
-  // Format recurring task info
-  const getRecurringInfo = () => {
-    let baseText = '';
-    if (task.recurringInterval === 'daily') baseText = 'Repeats daily';
-    else if (
-      task.recurringInterval === 'weekly' &&
-      task.recurringDays?.length
-    ) {
-      baseText = `Repeats weekly on ${task.recurringDays
-        .map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d])
-        .join(', ')}`;
-    } else if (task.recurringInterval === 'weekly') baseText = 'Repeats weekly';
-    else if (task.recurringInterval === 'monthly') baseText = 'Repeats monthly';
-
-    // Add end repeat info
-    if (task.recurringEndType === 'after' && task.recurringEndCount) {
-      return `${baseText}, ${task.recurringCurrentCount || 1} of ${task.recurringEndCount} times`;
-    }
-
-    return baseText;
-  };
-
   // Handle card click for editing
   const handleCardClick = (e: React.MouseEvent) => {
     // Only trigger edit if not clicking on the completion toggle
@@ -75,16 +53,21 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
         <div className="flex-1 min-w-0">
           {/* Top row with task name and metadata */}
           <div className="flex items-center justify-between mb-2">
-            {/* Task Name (strikethrough if completed) */}
-            <h3
-              className={`text-lg font-semibold  ${
-                task.completed
-                  ? 'text-neutral-600 line-through'
-                  : 'text-neutral-900'
-              }`}
-            >
-              {task.name}
-            </h3>
+            {/* Task Name with recurring icon if applicable (strikethrough if completed) */}
+            <div className="flex items-center gap-1">
+              <h3
+                className={`text-lg font-semibold  ${
+                  task.completed
+                    ? 'text-neutral-600 line-through'
+                    : 'text-neutral-900'
+                }`}
+              >
+                {task.name}
+              </h3>
+              {task.isRecurring && (
+                <RefreshCw className="w-4 h-4 text-accent-700" />
+              )}
+            </div>
 
             {/* Right side info - inline */}
             <div className="flex items-center gap-3 ml-4">
@@ -126,15 +109,7 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
             </div>
           </div>
 
-          {/* Recurring Indicator */}
-          {task.isRecurring && (
-            <div>
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-accent-100 text-accent-700">
-                <RefreshCw className="w-3 h-3" />
-                {getRecurringInfo()}
-              </span>
-            </div>
-          )}
+          {/* Removed recurring indicator text */}
         </div>
       </div>
     </div>
