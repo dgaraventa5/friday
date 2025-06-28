@@ -146,7 +146,11 @@ function isWeekend(date: Date) {
 }
 
 // Check if a recurring task should appear on a specific date
-function shouldRecurringTaskAppearOnDate(task: Task, date: Date): boolean {
+function shouldRecurringTaskAppearOnDate(
+  task: Task,
+  date: Date,
+  allTasks: Task[] = [],
+): boolean {
   if (!task.isRecurring || !task.recurringInterval) {
     return true; // Non-recurring tasks follow normal scheduling
   }
@@ -154,6 +158,20 @@ function shouldRecurringTaskAppearOnDate(task: Task, date: Date): boolean {
   // If the task's dueDate is the same as the date we're checking, it should appear
   if (isSameNormalizedDay(task.dueDate, date)) {
     return true;
+  }
+
+  // Check if there's already a completed task with the same name on this date
+  // This prevents new recurring tasks from appearing on the same day after completion
+  const dateKey = getDateKey(date);
+  const hasCompletedTaskOnSameDay = allTasks.some(
+    (otherTask) =>
+      otherTask.name === task.name &&
+      otherTask.completed &&
+      getDateKey(otherTask.dueDate) === dateKey,
+  );
+
+  if (hasCompletedTaskOnSameDay) {
+    return false;
   }
 
   // For recurring tasks, check if the date matches the recurrence pattern
@@ -229,7 +247,11 @@ export function assignStartDates(
 
     // Find recurring tasks that should appear on this date
     const recurringTasksForDay = recurringTasks.filter((task) =>
-      shouldRecurringTaskAppearOnDate(task, normalizedCurrentDate),
+      shouldRecurringTaskAppearOnDate(
+        task,
+        normalizedCurrentDate,
+        normalizedTasks,
+      ),
     );
 
     if (recurringTasksForDay.length > 0) {
