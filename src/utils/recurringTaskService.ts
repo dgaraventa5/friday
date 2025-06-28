@@ -45,6 +45,39 @@ export function generateNextRecurringTask(task: Task): Task | null {
     task.recurringDays,
   );
 
+  // Ensure the next due date is not today (not the same day as the completed task)
+  const today = normalizeDate(new Date());
+  const todayKey = getDateKey(today);
+  const nextDueDateKey = getDateKey(nextDueDate);
+
+  // If the next due date falls on today, move it to the next occurrence
+  if (nextDueDateKey === todayKey) {
+    // Get the next occurrence after this one
+    const futureDueDate = getNextRecurringDate(
+      nextDueDate,
+      task.recurringInterval,
+      task.recurringDays,
+    );
+
+    // Increment the current count for tasks with 'after' end type
+    const recurringCurrentCount =
+      task.recurringEndType === 'after' && task.recurringCurrentCount
+        ? task.recurringCurrentCount + 1
+        : task.recurringCurrentCount;
+
+    return {
+      ...task,
+      id: crypto.randomUUID(),
+      completed: false,
+      dueDate: futureDueDate,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      completedAt: undefined,
+      recurringCurrentCount,
+      startDate: futureDueDate, // Set startDate to the futureDueDate
+    };
+  }
+
   // Increment the current count for tasks with 'after' end type
   const recurringCurrentCount =
     task.recurringEndType === 'after' && task.recurringCurrentCount
