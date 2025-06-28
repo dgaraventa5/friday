@@ -767,7 +767,8 @@ export { db, convertTimestamps };
 export async function migrateTasksToFirestore(userId: string): Promise<void> {
   try {
     console.log('[Firestore] Checking for tasks to migrate');
-    const localTasks = loadTasks();
+    const userPrefix = `user_${userId}_`;
+    const localTasks = loadTasks(userPrefix);
 
     if (localTasks && localTasks.length > 0) {
       console.log(
@@ -799,7 +800,7 @@ export async function migrateTasksToFirestore(userId: string): Promise<void> {
       console.log('[Firestore] Migration complete');
 
       // Clear local storage after successful migration
-      saveTasks([]);
+      saveTasks([], userPrefix);
     } else {
       console.log('[Firestore] No tasks to migrate');
     }
@@ -835,7 +836,8 @@ export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
     console.error('[Firestore] Error fetching tasks:', error);
 
     // If fetching fails, try to return local tasks as fallback
-    const localTasks = loadTasks();
+    const userPrefix = `user_${userId}_`;
+    const localTasks = loadTasks(userPrefix);
     console.log(`[Firestore] Falling back to ${localTasks.length} local tasks`);
     return localTasks;
   }
@@ -865,22 +867,92 @@ export async function enableNetwork(): Promise<void> {
 
 // Force sync data from Firestore
 export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
-  try {
-    // First enable the network to ensure we get fresh data
-    const { enableNetwork } = await import('firebase/firestore');
-    await enableNetwork(db);
-    console.log('[Firestore] Network enabled for force sync');
+  console.log('[Firestore] Starting force sync for user', userId);
+  console.log(`[Firestore] Current persistence type: ${persistenceType}`);
 
-    // Then fetch the latest tasks
-    const tasks = await fetchTasksFromFirestore(userId);
+  // Track sync attempt for analytics/debugging
+  const syncStartTime = Date.now();
+  let retryCount = 0;
+  const MAX_RETRIES = 3;
 
-    // Update local storage with the latest data
-    saveTasks(tasks);
-    console.log(`[Firestore] Force synced ${tasks.length} tasks`);
+  const attemptSync = async (): Promise<Task[]> => {
+    try {
+      // First ensure network is enabled
+      const { enableNetwork } = await import('firebase/firestore');
+      await enableNetwork(db);
+      console.log('[Firestore] Network enabled for force sync');
 
-    return tasks;
-  } catch (error) {
-    console.error('[Firestore] Force sync failed:', error);
-    throw error;
-  }
+      // Wait a moment to ensure connection is established
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Fetch the latest tasks
+      console.log('[Firestore] Fetching latest data from server');
+      const tasksQuery = query(
+        collection(db, COLLECTIONS.TASKS),
+        where('userId', '==', userId),
+      );
+
+      const querySnapshot = await getDocs(tasksQuery);
+
+      // Process the results
+      const tasks: Task[] = [];
+      querySnapshot.forEach((doc) => {
+        const taskData = doc.data();
+        const task = convertTimestamps({
+          id: doc.id,
+          ...taskData,
+        });
+        tasks.push(task as Task);
+      });
+
+      // Update local storage with the latest data
+      saveTasks(tasks, `user_${userId}_`);
+
+      // Save a timestamp of last successful Firestore sync
+      localStorage.setItem(
+        `user_${userId}_last_firestore_sync`,
+        new Date().toISOString(),
+      );
+
+      console.log(
+        `[Firestore] Force synced ${tasks.length} tasks successfully`,
+      );
+      console.log(
+        `[Firestore] Sync completed in ${Date.now() - syncStartTime}ms`,
+      );
+
+      return tasks;
+    } catch (error) {
+      console.error('[Firestore] Force sync attempt failed:', error);
+
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        console.log(
+          `[Firestore] Retrying sync (${retryCount}/${MAX_RETRIES})...`,
+        );
+        // Exponential backoff
+        const backoffTime = Math.pow(2, retryCount) * 500;
+        await new Promise((resolve) => setTimeout(resolve, backoffTime));
+        return attemptSync();
+      }
+
+      // If all retries failed, try to get data from local storage as fallback
+      console.log(
+        '[Firestore] All sync attempts failed, falling back to local storage',
+      );
+      const userPrefix = `user_${userId}_`;
+      const localTasks = loadTasks(userPrefix);
+
+      if (localTasks.length > 0) {
+        console.log(
+          `[Firestore] Retrieved ${localTasks.length} tasks from local storage`,
+        );
+        return localTasks;
+      }
+
+      throw new Error('Failed to sync data and no local data available');
+    }
+  };
+
+  return attemptSync();
 }
