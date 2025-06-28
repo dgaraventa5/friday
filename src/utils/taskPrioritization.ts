@@ -215,6 +215,9 @@ export function assignStartDates(
   const recurringAssignments: Task[] = [];
   const maxDaysToLookAhead = 14; // Look ahead 14 days for scheduling
 
+  // Track recurring tasks by name and date to avoid duplicates
+  const recurringTaskTracker = new Map<string, Task>();
+
   for (let i = 0; i < maxDaysToLookAhead; i++) {
     const currentDate = new Date(today);
     currentDate.setDate(currentDate.getDate() + i);
@@ -237,9 +240,19 @@ export function assignStartDates(
         return scoreB - scoreA;
       });
 
+      // Deduplicate recurring tasks by name for this date
+      const deduplicatedTasks: Task[] = [];
+      recurringTasksForDay.forEach((task) => {
+        const taskDateKey = `${task.name}_${dateKey}`;
+        if (!recurringTaskTracker.has(taskDateKey)) {
+          recurringTaskTracker.set(taskDateKey, task);
+          deduplicatedTasks.push(task);
+        }
+      });
+
       // Add recurring tasks to assignments with the current date
       recurringAssignments.push(
-        ...recurringTasksForDay.map((task) => ({
+        ...deduplicatedTasks.map((task) => ({
           ...task,
           startDate: normalizedCurrentDate,
         })),
