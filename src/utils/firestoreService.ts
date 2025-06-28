@@ -1,6 +1,5 @@
 // Firestore service for task management
 import {
-  getFirestore,
   collection,
   doc,
   setDoc,
@@ -13,6 +12,11 @@ import {
   enableIndexedDbPersistence,
   connectFirestoreEmulator,
   getDoc,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentSingleTabManager,
+  memoryLocalCache,
+  Firestore,
 } from 'firebase/firestore';
 import { app } from './firebase';
 import { Task, Category, UserPreferences } from '../types/task';
@@ -25,43 +29,117 @@ import {
   loadPreferences,
 } from './localStorage';
 
-// Initialize Firestore
-const db = getFirestore(app);
+// Detect if we're running on a mobile browser
+const isMobileBrowser = () => {
+  const userAgent =
+    navigator.userAgent ||
+    navigator.vendor ||
+    (window as Window & typeof globalThis & { opera?: string }).opera ||
+    '';
+  return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
+    userAgent.toLowerCase(),
+  );
+};
 
-// Flag to track if Firestore is available
+// Detect if we're running in private browsing mode (Safari)
+const isPrivateBrowsing = async (): Promise<boolean> => {
+  try {
+    const storage = window.localStorage;
+    const testKey = 'test-private-browsing';
+    storage.setItem(testKey, '1');
+    storage.removeItem(testKey);
+    return false;
+  } catch {
+    // Unused error variable omitted
+    return true;
+  }
+};
+
+// Initialize Firestore with appropriate cache based on browser environment
+let db: Firestore;
+let persistenceType = 'unknown';
 let isFirestoreAvailable = true;
 
-// Enable offline persistence
-try {
-  console.log('[Firestore] Enabling offline persistence');
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn(
-        '[Firestore] Multiple tabs open, persistence can only be enabled in one tab at a time.',
-      );
-    } else if (err.code === 'unimplemented') {
-      console.warn(
-        '[Firestore] The current browser does not support all features required for Firestore persistence.',
-      );
-    }
-  });
-} catch (error) {
-  console.error('[Firestore] Error enabling persistence:', error);
-}
+const initializeFirestoreWithAppropriateCache = async () => {
+  try {
+    const isPrivate = await isPrivateBrowsing();
+    const isMobile = isMobileBrowser();
 
-// Use emulator in development if configured
-if (
-  import.meta.env.DEV &&
-  import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true'
-) {
-  const host = import.meta.env.VITE_FIRESTORE_EMULATOR_HOST || 'localhost';
-  const port = parseInt(
-    import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || '8080',
-    10,
-  );
-  console.log(`[Firestore] Using emulator at ${host}:${port}`);
-  connectFirestoreEmulator(db, host, port);
-}
+    console.log(
+      `[Firestore] Environment: Mobile: ${isMobile}, Private Browsing: ${isPrivate}`,
+    );
+
+    if (isMobile || isPrivate) {
+      console.log(
+        '[Firestore] Mobile or private browsing detected, using memory cache',
+      );
+      persistenceType = 'memory';
+      db = initializeFirestore(app, {
+        localCache: memoryLocalCache(),
+      });
+    } else {
+      console.log(
+        '[Firestore] Desktop browser detected, using persistent cache',
+      );
+      persistenceType = 'indexeddb';
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentSingleTabManager(),
+        }),
+      });
+
+      // Try to enable offline persistence with better error handling
+      try {
+        console.log('[Firestore] Enabling offline persistence');
+        await enableIndexedDbPersistence(db).catch((err) => {
+          if (err.code === 'failed-precondition') {
+            console.warn(
+              '[Firestore] Multiple tabs open, persistence can only be enabled in one tab at a time.',
+            );
+          } else if (err.code === 'unimplemented') {
+            console.warn(
+              '[Firestore] The current browser does not support all features required for Firestore persistence.',
+            );
+          } else {
+            console.error('[Firestore] Unknown persistence error:', err);
+          }
+        });
+      } catch (error) {
+        console.error('[Firestore] Error enabling persistence:', error);
+      }
+    }
+
+    // Use emulator in development if configured
+    if (
+      import.meta.env.DEV &&
+      import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true'
+    ) {
+      const host = import.meta.env.VITE_FIRESTORE_EMULATOR_HOST || 'localhost';
+      const port = parseInt(
+        import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || '8080',
+        10,
+      );
+      console.log(`[Firestore] Using emulator at ${host}:${port}`);
+      connectFirestoreEmulator(db, host, port);
+    }
+  } catch (error) {
+    console.warn(
+      '[Firestore] Failed to initialize with appropriate cache, falling back to memory cache',
+      error,
+    );
+    persistenceType = 'memory';
+    db = initializeFirestore(app, {
+      localCache: memoryLocalCache(),
+    });
+  }
+};
+
+// Initialize Firestore
+(async () => {
+  await initializeFirestoreWithAppropriateCache();
+})().catch((error) => {
+  console.error('[Firestore] Error during initialization:', error);
+});
 
 // Collection names
 const COLLECTIONS = {
@@ -169,51 +247,71 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
       return loadTasks(`user_${userId}_`);
     }
 
-    console.log(`[Firestore] Loading tasks for user: ${userId}`);
-    const tasksRef = collection(db, COLLECTIONS.TASKS);
-    const q = query(tasksRef, where('userId', '==', userId));
-    const querySnapshot = await getDocs(q);
-
-    console.log(`[Firestore] Found ${querySnapshot.size} tasks`);
-    const tasks: Task[] = [];
-    querySnapshot.forEach((document) => {
-      const taskData = convertTimestamps(document.data());
-      // Remove userId field as it's not part of the Task interface
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { userId: _taskUserId, ...taskWithoutUserId } = taskData;
-      tasks.push(taskWithoutUserId as Task);
-    });
-
-    console.log(`[Firestore] Returning ${tasks.length} tasks`);
-
-    // Update last sync timestamp
-    localStorage.setItem(
-      `user_${userId}_last_firestore_sync`,
-      new Date().toISOString(),
+    console.log(
+      `[Firestore] Loading tasks for user: ${userId} with persistence type: ${persistenceType}`,
     );
 
-    // Only use localStorage as fallback if no tasks found in Firestore
-    if (tasks.length === 0) {
-      const localTasks = loadTasks(`user_${userId}_`);
-      if (localTasks.length > 0) {
+    // Always try to get from server first
+    const tasksRef = collection(db, COLLECTIONS.TASKS);
+    const q = query(tasksRef, where('userId', '==', userId));
+
+    try {
+      const querySnapshot = await getDocs(q);
+      console.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
+
+      if (querySnapshot.size > 0) {
+        const tasks: Task[] = [];
+        querySnapshot.forEach((document) => {
+          const taskData = convertTimestamps(document.data());
+          // Remove userId field as it's not part of the Task interface
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { userId: _taskUserId, ...taskWithoutUserId } = taskData;
+          tasks.push(taskWithoutUserId as Task);
+        });
+
+        // Update local storage as backup
+        saveTasks(tasks, `user_${userId}_`);
         console.log(
-          `[Firestore] No tasks in Firestore, using ${localTasks.length} tasks from localStorage`,
+          `[Firestore] Saved ${tasks.length} tasks to localStorage as backup`,
         );
 
-        // If we found tasks in localStorage but not in Firestore, save them to Firestore
-        // This helps with cross-device synchronization
+        // Update last sync timestamp
+        localStorage.setItem(
+          `user_${userId}_last_firestore_sync`,
+          new Date().toISOString(),
+        );
+
+        return tasks;
+      }
+    } catch (serverError) {
+      console.warn(
+        '[Firestore] Error fetching from server, will try local storage:',
+        serverError,
+      );
+    }
+
+    // If server fetch failed or returned no results, try local storage
+    const localTasks = loadTasks(`user_${userId}_`);
+    if (localTasks.length > 0) {
+      console.log(
+        `[Firestore] Using ${localTasks.length} tasks from localStorage`,
+      );
+
+      // Try to sync back to server when possible
+      if (navigator.onLine) {
         saveTasksToFirestore(userId, localTasks).catch((err) =>
           console.error(
             '[Firestore] Error syncing local tasks to Firestore:',
             err,
           ),
         );
-
-        return localTasks;
       }
+
+      return localTasks;
     }
 
-    return tasks;
+    console.log('[Firestore] No tasks found in server or localStorage');
+    return [];
   } catch (error) {
     console.error('Error loading tasks from Firestore:', error);
     isFirestoreAvailable = false;
@@ -659,5 +757,130 @@ export async function migrateLocalStorageToFirestore(
     console.error('[Firestore] Error during migration:', error);
     isFirestoreAvailable = false;
     // No need to throw, we'll just keep using localStorage
+  }
+}
+
+// Export db and helper functions for use in other components
+export { db, convertTimestamps };
+
+// Migrate tasks from localStorage to Firestore
+export async function migrateTasksToFirestore(userId: string): Promise<void> {
+  try {
+    console.log('[Firestore] Checking for tasks to migrate');
+    const localTasks = loadTasks();
+
+    if (localTasks && localTasks.length > 0) {
+      console.log(
+        `[Firestore] Migrating ${localTasks.length} tasks to Firestore`,
+      );
+
+      const batch = writeBatch(db);
+
+      for (const task of localTasks) {
+        const taskRef = doc(collection(db, 'tasks'));
+        const taskWithUser = {
+          ...task,
+          userId,
+          // Convert Date objects to Firestore Timestamps
+          dueDate: task.dueDate
+            ? Timestamp.fromDate(new Date(task.dueDate))
+            : null,
+          createdAt: task.createdAt
+            ? Timestamp.fromDate(new Date(task.createdAt))
+            : Timestamp.now(),
+          completedAt: task.completedAt
+            ? Timestamp.fromDate(new Date(task.completedAt))
+            : null,
+        };
+        batch.set(taskRef, taskWithUser);
+      }
+
+      await batch.commit();
+      console.log('[Firestore] Migration complete');
+
+      // Clear local storage after successful migration
+      saveTasks([]);
+    } else {
+      console.log('[Firestore] No tasks to migrate');
+    }
+  } catch (error) {
+    console.error('[Firestore] Migration failed:', error);
+    throw error;
+  }
+}
+
+// Fetch tasks from Firestore for a specific user
+export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
+  try {
+    console.log(`[Firestore] Fetching tasks for user ${userId}`);
+    const tasksQuery = query(
+      collection(db, 'tasks'),
+      where('userId', '==', userId),
+    );
+    const querySnapshot = await getDocs(tasksQuery);
+
+    const tasks: Task[] = [];
+    querySnapshot.forEach((doc) => {
+      const taskData = doc.data();
+      const task = convertTimestamps({
+        id: doc.id,
+        ...taskData,
+      });
+      tasks.push(task as Task);
+    });
+
+    console.log(`[Firestore] Fetched ${tasks.length} tasks`);
+    return tasks;
+  } catch (error) {
+    console.error('[Firestore] Error fetching tasks:', error);
+
+    // If fetching fails, try to return local tasks as fallback
+    const localTasks = loadTasks();
+    console.log(`[Firestore] Falling back to ${localTasks.length} local tasks`);
+    return localTasks;
+  }
+}
+
+// Disable network for offline mode
+export async function disableNetwork(): Promise<void> {
+  try {
+    const { disableNetwork } = await import('firebase/firestore');
+    await disableNetwork(db);
+    console.log('[Firestore] Network disabled');
+  } catch (error) {
+    console.error('[Firestore] Failed to disable network:', error);
+  }
+}
+
+// Enable network to reconnect
+export async function enableNetwork(): Promise<void> {
+  try {
+    const { enableNetwork } = await import('firebase/firestore');
+    await enableNetwork(db);
+    console.log('[Firestore] Network enabled');
+  } catch (error) {
+    console.error('[Firestore] Failed to enable network:', error);
+  }
+}
+
+// Force sync data from Firestore
+export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
+  try {
+    // First enable the network to ensure we get fresh data
+    const { enableNetwork } = await import('firebase/firestore');
+    await enableNetwork(db);
+    console.log('[Firestore] Network enabled for force sync');
+
+    // Then fetch the latest tasks
+    const tasks = await fetchTasksFromFirestore(userId);
+
+    // Update local storage with the latest data
+    saveTasks(tasks);
+    console.log(`[Firestore] Force synced ${tasks.length} tasks`);
+
+    return tasks;
+  } catch (error) {
+    console.error('[Firestore] Force sync failed:', error);
+    throw error;
   }
 }
