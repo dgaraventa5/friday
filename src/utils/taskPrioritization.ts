@@ -273,10 +273,12 @@ export function assignStartDates(
       });
 
       // Add recurring tasks to assignments with the current date
+      // Update both startDate and dueDate to match the day the task appears on the schedule
       recurringAssignments.push(
         ...deduplicatedTasks.map((task) => ({
           ...task,
           startDate: normalizedCurrentDate,
+          dueDate: normalizedCurrentDate, // Set dueDate to match the day it appears on schedule
         })),
       );
     }
