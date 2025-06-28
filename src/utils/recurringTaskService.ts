@@ -79,14 +79,15 @@ export function processRecurringTasks(tasks: Task[]): Task[] {
   );
 
   const newTasks: Task[] = [];
-  const existingTaskDates = new Map<string, Set<string>>();
 
-  // Create a map of existing task dates by name to avoid duplicates
+  // Create a map to track which dates already have which recurring tasks
+  // The key will be a combination of task name and date
+  const existingTasksMap = new Map<string, boolean>();
+
+  // First, populate the map with existing tasks
   tasks.forEach((task) => {
-    if (!existingTaskDates.has(task.name)) {
-      existingTaskDates.set(task.name, new Set());
-    }
-    existingTaskDates.get(task.name)!.add(getDateKey(task.dueDate));
+    const taskDateKey = `${task.name}_${getDateKey(task.dueDate)}`;
+    existingTasksMap.set(taskDateKey, true);
   });
 
   // For each recurring task, generate future instances
@@ -103,6 +104,7 @@ export function processRecurringTasks(tasks: Task[]): Task[] {
       // Check if this task instance already exists
       const taskName = currentTask.name;
       const dateString = getDateKey(nextDate);
+      const taskDateKey = `${taskName}_${dateString}`;
 
       // Calculate the next recurrence count
       const nextRecurringCount =
@@ -121,10 +123,8 @@ export function processRecurringTasks(tasks: Task[]): Task[] {
         break;
       }
 
-      if (
-        !existingTaskDates.has(taskName) ||
-        !existingTaskDates.get(taskName)!.has(dateString)
-      ) {
+      // Only create a new task if one doesn't already exist for this name and date
+      if (!existingTasksMap.has(taskDateKey)) {
         // Create a new task instance
         const newTask: Task = {
           ...currentTask,
@@ -140,11 +140,8 @@ export function processRecurringTasks(tasks: Task[]): Task[] {
 
         newTasks.push(newTask);
 
-        // Add to our tracking set
-        if (!existingTaskDates.has(taskName)) {
-          existingTaskDates.set(taskName, new Set());
-        }
-        existingTaskDates.get(taskName)!.add(dateString);
+        // Add to our tracking map
+        existingTasksMap.set(taskDateKey, true);
       }
 
       // Move to the next occurrence
