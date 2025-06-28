@@ -59,7 +59,7 @@ function AppContent() {
         (t) =>
           t.completed &&
           !completedFocusIds.includes(t.id) &&
-          isToday(t.dueDate),
+          (isToday(t.dueDate) || isToday(t.startDate)),
       )
       .map((t) => t.id);
     if (completedToday.length > 0) {
