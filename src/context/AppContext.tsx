@@ -113,19 +113,30 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         tasks: state.tasks.filter((task) => task.id !== action.payload),
       };
-    case 'TOGGLE_TASK_COMPLETE':
+    case 'TOGGLE_TASK_COMPLETE': {
+      const updatedTasks = state.tasks.map((task) =>
+        task.id === action.payload
+          ? {
+              ...task,
+              completed: !task.completed,
+              completedAt: !task.completed ? new Date() : undefined,
+            }
+          : task,
+      );
+
+      // Debug logging for completed task toggle
+      const toggledTask = updatedTasks.find(
+        (task) => task.id === action.payload,
+      );
+      console.log(
+        `[AppContext] Task ${toggledTask?.name} (${action.payload}) toggled to ${toggledTask?.completed ? 'completed' : 'incomplete'}`,
+      );
+
       return {
         ...state,
-        tasks: state.tasks.map((task) =>
-          task.id === action.payload
-            ? {
-                ...task,
-                completed: !task.completed,
-                completedAt: !task.completed ? new Date() : undefined,
-              }
-            : task,
-        ),
+        tasks: updatedTasks,
       };
+    }
     case 'SET_CATEGORIES':
       return { ...state, categories: action.payload };
     case 'ADD_CATEGORY':

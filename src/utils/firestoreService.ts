@@ -194,9 +194,6 @@ export async function saveTasksToFirestore(
   tasks: Task[],
 ): Promise<void> {
   try {
-    // Debug log to track user ID
-    console.log('[Firestore DEBUG] saveTasksToFirestore for user ID:', userId);
-
     if (!isFirestoreAvailable) {
       console.log('[Firestore] Falling back to localStorage for saving tasks');
       saveTasks(tasks, `user_${userId}_`);
@@ -215,13 +212,19 @@ export async function saveTasksToFirestore(
       batch.delete(document.ref);
     });
 
-    // Add all tasks
+    // Add all tasks - make sure to include completed tasks
     tasks.forEach((task) => {
       const taskRef = doc(collection(db, COLLECTIONS.TASKS));
       const taskWithUser = {
         ...prepareForFirestore(task),
         userId,
       };
+
+      // Debug log for completed tasks
+      if (task.completed) {
+        console.log('[Firestore] Saving completed task:', task.name, task.id);
+      }
+
       batch.set(taskRef, taskWithUser);
     });
 

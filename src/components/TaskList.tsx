@@ -55,7 +55,15 @@ export function TaskList({
 
         // Use the same string comparison approach for consistency
         const taskStartDateString = getDateKey(task.startDate);
-        return taskStartDateString === todayDateString;
+        const isToday = taskStartDateString === todayDateString;
+
+        // Debug logs for completed tasks filtering
+        console.log('[TaskList] Completed task:', task.name);
+        console.log('[TaskList] Task start date:', taskStartDateString);
+        console.log('[TaskList] Today date string:', todayDateString);
+        console.log('[TaskList] Is today?', isToday);
+
+        return isToday;
       });
 
   const allTasksCompleted =
@@ -106,9 +114,7 @@ export function TaskList({
               getting started is breaking your complex overwhelming tasks into
               small manageable tasks."
             </p>
-            <p className="text-xs text-neutral-500 mt-2 ">
-              — Mark Twain
-            </p>
+            <p className="text-xs text-neutral-500 mt-2 ">— Mark Twain</p>
           </div>
         </div>
       </PageLayout>
