@@ -1,4 +1,5 @@
 import { User as FirebaseUser } from 'firebase/auth';
+import { Category } from './task';
 
 export interface User {
   uid: string;
@@ -8,6 +9,18 @@ export interface User {
   isAnonymous: boolean;
   emailVerified: boolean;
   providerId: string;
+}
+
+export interface UserPreferences {
+  maxDailyTasks: number;
+  categories: Category[];
+  theme: 'light' | 'dark';
+  notifications: boolean;
+  defaultView?: string;
+  notificationsEnabled?: boolean;
+  emailNotifications?: boolean;
+  defaultCategory?: string;
+  [key: string]: unknown; // Allow for additional preference fields
 }
 
 export interface AuthState {
@@ -24,6 +37,6 @@ export const mapFirebaseUserToUser = (firebaseUser: FirebaseUser): User => {
     photoURL: firebaseUser.photoURL,
     isAnonymous: firebaseUser.isAnonymous,
     emailVerified: firebaseUser.emailVerified,
-    providerId: firebaseUser.providerId || 'google.com'
+    providerId: firebaseUser.providerId || 'google.com',
   };
-}; 
+};

@@ -9,7 +9,6 @@ import {
   writeBatch,
   Timestamp,
   DocumentData,
-  enableIndexedDbPersistence,
   connectFirestoreEmulator,
   getDoc,
   initializeFirestore,
@@ -19,7 +18,9 @@ import {
   Firestore,
 } from 'firebase/firestore';
 import { app } from './firebase';
-import { Task, Category, UserPreferences } from '../types/task';
+import { Task } from '../types/task';
+import { Category } from '../types/task';
+import { UserPreferences } from '../types/user';
 import {
   saveTasks,
   loadTasks,
@@ -91,19 +92,14 @@ const initializeFirestoreWithAppropriateCache = async () => {
       // Try to enable offline persistence with better error handling
       try {
         console.log('[Firestore] Enabling offline persistence');
-        await enableIndexedDbPersistence(db).catch((err) => {
-          if (err.code === 'failed-precondition') {
-            console.warn(
-              '[Firestore] Multiple tabs open, persistence can only be enabled in one tab at a time.',
-            );
-          } else if (err.code === 'unimplemented') {
-            console.warn(
-              '[Firestore] The current browser does not support all features required for Firestore persistence.',
-            );
-          } else {
-            console.error('[Firestore] Unknown persistence error:', err);
-          }
-        });
+        // Note: The db object is already configured with persistentLocalCache above
+        // We don't need to call enableIndexedDbPersistence separately as it's now handled
+        // by the persistentLocalCache configuration
+
+        // Log success
+        console.log(
+          '[Firestore] Offline persistence enabled via persistentLocalCache',
+        );
       } catch (error) {
         console.error('[Firestore] Error enabling persistence:', error);
       }
@@ -175,7 +171,10 @@ const prepareForFirestore = <T>(obj: T): DocumentData => {
 
   // Convert Date objects to Firestore Timestamps
   Object.keys(result).forEach((key) => {
-    if (result[key] instanceof Date) {
+    // Handle undefined values - remove them to prevent Firestore errors
+    if (result[key] === undefined) {
+      delete result[key];
+    } else if (result[key] instanceof Date) {
       result[key] = Timestamp.fromDate(result[key] as Date);
     } else if (
       result[key] &&
@@ -855,8 +854,10 @@ export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
 // Disable network for offline mode
 export async function disableNetwork(): Promise<void> {
   try {
-    const { disableNetwork } = await import('firebase/firestore');
-    await disableNetwork(db);
+    const { disableNetwork: disableFirestoreNetwork } = await import(
+      'firebase/firestore'
+    );
+    await disableFirestoreNetwork(db);
     console.log('[Firestore] Network disabled');
   } catch (error) {
     console.error('[Firestore] Failed to disable network:', error);
@@ -866,8 +867,10 @@ export async function disableNetwork(): Promise<void> {
 // Enable network to reconnect
 export async function enableNetwork(): Promise<void> {
   try {
-    const { enableNetwork } = await import('firebase/firestore');
-    await enableNetwork(db);
+    const { enableNetwork: enableFirestoreNetwork } = await import(
+      'firebase/firestore'
+    );
+    await enableFirestoreNetwork(db);
     console.log('[Firestore] Network enabled');
   } catch (error) {
     console.error('[Firestore] Failed to enable network:', error);
@@ -894,24 +897,10 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
   const attemptSync = async (): Promise<Task[]> => {
     try {
       // First ensure network is enabled and reset any connection state
-      const { enableNetwork, disableNetwork } = await import(
+      const { enableNetwork: enableFirestoreNetwork } = await import(
         'firebase/firestore'
       );
-
-      if (isMobile) {
-        // For mobile, we'll try to reset the connection completely
-        try {
-          await disableNetwork(db);
-          console.log('[Firestore] Network disabled for reset');
-          // Give it a moment to complete
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        } catch (e) {
-          console.log('[Firestore] Error disabling network:', e);
-          // Continue anyway
-        }
-      }
-
-      await enableNetwork(db);
+      await enableFirestoreNetwork(db);
       console.log('[Firestore] Network enabled for force sync');
 
       // Wait a moment to ensure connection is established
