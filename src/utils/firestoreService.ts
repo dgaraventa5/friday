@@ -195,6 +195,9 @@ export async function saveTasksToFirestore(
   tasks: Task[],
 ): Promise<void> {
   try {
+    // Debug log to track user ID
+    console.log('[Firestore DEBUG] saveTasksToFirestore for user ID:', userId);
+
     if (!isFirestoreAvailable) {
       console.log('[Firestore] Falling back to localStorage for saving tasks');
       saveTasks(tasks, `user_${userId}_`);
@@ -242,6 +245,12 @@ export async function saveTasksToFirestore(
 // Load tasks from Firestore
 export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
   try {
+    // Debug log to track user ID
+    console.log(
+      '[Firestore DEBUG] loadTasksFromFirestore for user ID:',
+      userId,
+    );
+
     if (!isFirestoreAvailable) {
       console.log('[Firestore] Falling back to localStorage for loading tasks');
       return loadTasks(`user_${userId}_`);
@@ -867,6 +876,9 @@ export async function enableNetwork(): Promise<void> {
 
 // Force sync data from Firestore
 export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
+  // Debug log to track user ID
+  console.log('[Firestore DEBUG] forceSyncFromFirestore for user ID:', userId);
+
   console.log('[Firestore] Starting force sync for user', userId);
   console.log(`[Firestore] Current persistence type: ${persistenceType}`);
 
@@ -916,10 +928,24 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
 
       const querySnapshot = await getDocs(tasksQuery);
 
+      // Debug log for query results
+      console.log('[Firestore DEBUG] Query executed with user ID:', userId);
+      console.log('[Firestore DEBUG] Query returned size:', querySnapshot.size);
+      console.log(
+        '[Firestore DEBUG] Query metadata fromCache:',
+        querySnapshot.metadata.fromCache,
+      );
+
       // Process the results
       const tasks: Task[] = [];
       querySnapshot.forEach((doc) => {
         const taskData = doc.data();
+        // Log the user ID from the task data for debugging
+        console.log(
+          '[Firestore DEBUG] Task user ID in document:',
+          taskData.userId,
+        );
+
         const task = convertTimestamps({
           id: doc.id,
           ...taskData,

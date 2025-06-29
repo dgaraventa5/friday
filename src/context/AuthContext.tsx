@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, signInWithGoogle, logoutUser } from '../utils/firebase';
 import { User, AuthState, mapFirebaseUserToUser } from '../types/user';
@@ -25,6 +31,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
+        // Debug log to track user authentication
+        if (user) {
+          console.log('[Auth DEBUG] User authenticated with ID:', user.uid);
+        } else {
+          console.log('[Auth DEBUG] No authenticated user');
+        }
+
         setAuthState({
           user: user ? mapFirebaseUserToUser(user) : null,
           loading: false,
@@ -38,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           loading: false,
           error: error.message,
         });
-      }
+      },
     );
 
     // Cleanup subscription
@@ -61,7 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return null;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error during sign-in';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error during sign-in';
       setAuthState({
         user: null,
         loading: false,
@@ -82,7 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: null,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error during logout';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error during logout';
       setAuthState((prev) => ({
         ...prev,
         loading: false,
@@ -105,4 +120,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-} 
+}
