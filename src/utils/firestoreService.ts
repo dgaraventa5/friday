@@ -875,15 +875,37 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
   let retryCount = 0;
   const MAX_RETRIES = 3;
 
+  // For mobile browsers, we'll use a more aggressive approach
+  const isMobile = isMobileBrowser();
+  console.log(`[Firestore] Device type: ${isMobile ? 'Mobile' : 'Desktop'}`);
+
   const attemptSync = async (): Promise<Task[]> => {
     try {
-      // First ensure network is enabled
-      const { enableNetwork } = await import('firebase/firestore');
+      // First ensure network is enabled and reset any connection state
+      const { enableNetwork, disableNetwork } = await import(
+        'firebase/firestore'
+      );
+
+      if (isMobile) {
+        // For mobile, we'll try to reset the connection completely
+        try {
+          await disableNetwork(db);
+          console.log('[Firestore] Network disabled for reset');
+          // Give it a moment to complete
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } catch (e) {
+          console.log('[Firestore] Error disabling network:', e);
+          // Continue anyway
+        }
+      }
+
       await enableNetwork(db);
       console.log('[Firestore] Network enabled for force sync');
 
       // Wait a moment to ensure connection is established
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Use a longer timeout for mobile devices
+      const connectionDelay = isMobile ? 1000 : 500;
+      await new Promise((resolve) => setTimeout(resolve, connectionDelay));
 
       // Fetch the latest tasks
       console.log('[Firestore] Fetching latest data from server');
@@ -905,14 +927,47 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
         tasks.push(task as Task);
       });
 
-      // Update local storage with the latest data
-      saveTasks(tasks, `user_${userId}_`);
+      // Verify the data was actually fetched from the server
+      if (querySnapshot.metadata.fromCache && isMobile) {
+        console.warn(
+          '[Firestore] Data was served from cache, not server. Retrying...',
+        );
+        if (retryCount < MAX_RETRIES) {
+          retryCount++;
+          // Use a more aggressive backoff for this specific case
+          const backoffTime = Math.pow(2, retryCount) * 1000;
+          await new Promise((resolve) => setTimeout(resolve, backoffTime));
+          return attemptSync();
+        }
+      }
+
+      console.log(
+        `[Firestore] Successfully fetched ${tasks.length} tasks from server`,
+      );
+
+      // Update local storage with the latest data for redundancy
+      // This ensures we have a copy even if IndexedDB fails on mobile
+      const userPrefix = `user_${userId}_`;
+      saveTasks(tasks, userPrefix);
 
       // Save a timestamp of last successful Firestore sync
       localStorage.setItem(
-        `user_${userId}_last_firestore_sync`,
+        `${userPrefix}last_firestore_sync`,
         new Date().toISOString(),
       );
+
+      // Verify the local storage was updated correctly
+      const localVerification = loadTasks(userPrefix);
+      if (localVerification.length !== tasks.length) {
+        console.warn(
+          '[Firestore] Local storage verification failed. Expected',
+          tasks.length,
+          'tasks but found',
+          localVerification.length,
+        );
+      } else {
+        console.log('[Firestore] Local storage verification successful');
+      }
 
       console.log(
         `[Firestore] Force synced ${tasks.length} tasks successfully`,
