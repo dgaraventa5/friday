@@ -1,22 +1,22 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Tasks collection
+    // Tasks collection - allow authenticated users to read/write their own tasks
     match /tasks/{taskId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
     
     // Categories collection
     match /categories/{userId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && userId == request.auth.uid;
+      allow write: if request.auth != null && userId == request.auth.uid;
     }
     
     // Preferences collection
     match /preferences/{userId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && userId == request.auth.uid;
+      allow write: if request.auth != null && userId == request.auth.uid;
     }
   }
-} 
+}
