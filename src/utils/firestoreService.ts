@@ -138,7 +138,7 @@ const initializeFirestoreWithAppropriateCache = async () => {
 });
 
 // Collection names
-const COLLECTIONS = {
+export const COLLECTIONS = {
   TASKS: 'tasks',
   CATEGORIES: 'categories',
   PREFERENCES: 'preferences',
@@ -269,13 +269,28 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
 
       if (querySnapshot.size > 0) {
         const tasks: Task[] = [];
+        const taskIds = new Set<string>(); // Track task IDs to prevent duplicates
+
         querySnapshot.forEach((document) => {
           const taskData = convertTimestamps(document.data());
           // Remove userId field as it's not part of the Task interface
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { userId: _taskUserId, ...taskWithoutUserId } = taskData;
-          tasks.push(taskWithoutUserId as Task);
+
+          // Only add the task if we haven't seen this ID before
+          if (!taskIds.has(taskWithoutUserId.id)) {
+            taskIds.add(taskWithoutUserId.id);
+            tasks.push(taskWithoutUserId as Task);
+          } else {
+            console.warn(
+              `[Firestore] Duplicate task ID detected: ${taskWithoutUserId.id}, skipping`,
+            );
+          }
         });
+
+        console.log(
+          `[Firestore] Returning ${tasks.length} unique tasks (filtered from ${querySnapshot.size})`,
+        );
 
         // Update local storage as backup
         saveTasks(tasks, `user_${userId}_`);
