@@ -58,7 +58,7 @@ const firebaseConfig = {
   ),
   authDomain: getEnvVar(
     'VITE_FIREBASE_AUTH_DOMAIN',
-    'friday---ai-task-planner.firebaseapp.com',
+    'friday---ai-task-planner.web.app',
   ),
   projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', 'friday---ai-task-planner'),
   storageBucket: getEnvVar(
