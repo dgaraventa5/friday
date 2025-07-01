@@ -112,10 +112,25 @@ function AppContent() {
   const todayDateString = getTodayKey();
 
   // Filter tasks that have a startDate matching today
-  const todayFocusTasks = assignedTasks.filter((t) => {
+  // First, get all tasks for today
+  const allTodayTasks = assignedTasks.filter((t) => {
     const taskDateString = getDateKey(t.startDate);
     return taskDateString === todayDateString;
   });
+
+  // Ensure we don't show more than 4 tasks total for today
+  // Priority: 1) Completed tasks for today, 2) Incomplete tasks by priority
+  const completedTodayTasks = allTodayTasks.filter((t) => t.completed);
+  const incompleteTodayTasks = allTodayTasks.filter((t) => !t.completed);
+
+  // Calculate how many incomplete tasks we can show
+  const maxIncompleteTasks = Math.max(0, 4 - completedTodayTasks.length);
+
+  // Combine completed tasks with up to maxIncompleteTasks incomplete tasks
+  const todayFocusTasks = [
+    ...completedTodayTasks,
+    ...incompleteTodayTasks.slice(0, maxIncompleteTasks),
+  ];
 
   // Debug logging for progress circle
   console.log("Today's Focus Tasks:", todayFocusTasks);

@@ -207,6 +207,18 @@ export function assignStartDates(
     createdAt: normalizeDate(task.createdAt),
   }));
 
+  // Get completed tasks by day to count them against the daily limit
+  const completedTasksByDay = new Map<string, number>();
+  normalizedTasks
+    .filter((task) => task.completed)
+    .forEach((task) => {
+      const dateKey = getDateKey(task.startDate);
+      completedTasksByDay.set(
+        dateKey,
+        (completedTasksByDay.get(dateKey) || 0) + 1,
+      );
+    });
+
   // Separate recurring and non-recurring tasks
   const recurringTasks = normalizedTasks.filter(
     (task) => task.isRecurring && !task.completed,
@@ -289,6 +301,7 @@ export function assignStartDates(
     const currentDate = new Date(today);
     currentDate.setDate(currentDate.getDate() + dayOffset);
     const normalizedCurrentDate = normalizeDate(currentDate);
+    const dateKey = getDateKey(normalizedCurrentDate);
     const isWknd = isWeekend(currentDate);
 
     // Count how many recurring tasks are already assigned to this day
@@ -296,20 +309,26 @@ export function assignStartDates(
       isSameNormalizedDay(task.startDate, normalizedCurrentDate),
     ).length;
 
-    // Calculate remaining capacity for this day
-    const remainingCapacity = Math.max(0, maxPerDay - recurringTasksCount);
+    // Count completed tasks for this day
+    const completedTasksCount = completedTasksByDay.get(dateKey) || 0;
 
-    // Skip to next day if no capacity left after recurring tasks
+    // Calculate remaining capacity for this day, accounting for completed tasks
+    const remainingCapacity = Math.max(
+      0,
+      maxPerDay - recurringTasksCount - completedTasksCount,
+    );
+
+    // Skip to next day if no capacity left after recurring tasks and completed tasks
     if (remainingCapacity <= 0) {
       console.log(
-        `Day ${dayOffset}: Skipping - ${recurringTasksCount} recurring tasks already at or exceeding max (${maxPerDay})`,
+        `Day ${dayOffset}: Skipping - ${recurringTasksCount} recurring tasks, ${completedTasksCount} completed tasks already at or exceeding max (${maxPerDay})`,
       );
       dayOffset++;
       continue;
     }
 
     console.log(
-      `Day ${dayOffset}: ${recurringTasksCount} recurring tasks, ${remainingCapacity} slots remaining (max: ${maxPerDay})`,
+      `Day ${dayOffset}: ${recurringTasksCount} recurring tasks, ${completedTasksCount} completed tasks, ${remainingCapacity} slots remaining (max: ${maxPerDay})`,
     );
 
     const currentBucket: typeof scoredNonRecurring = [];
@@ -350,7 +369,7 @@ export function assignStartDates(
     }
 
     console.log(
-      `Day ${dayOffset} final: ${recurringTasksCount + currentBucket.length} total tasks assigned`,
+      `Day ${dayOffset} final: ${recurringTasksCount + currentBucket.length + completedTasksCount} total tasks assigned (including ${completedTasksCount} completed)`,
     );
 
     // Any remaining unassigned tasks go to the next day
@@ -390,7 +409,7 @@ export function assignStartDates(
 
   // Group tasks by date
   result.forEach((task) => {
-    if (task.startDate && !task.completed) {
+    if (task.startDate) {
       const dateKey = getDateKey(task.startDate);
       if (!tasksByDay.has(dateKey)) {
         tasksByDay.set(dateKey, []);
@@ -401,9 +420,12 @@ export function assignStartDates(
 
   // Check for any days exceeding the limit
   tasksByDay.forEach((tasksForDay, dateKey) => {
+    const incompleteCount = tasksForDay.filter((t) => !t.completed).length;
+    const completedCount = tasksForDay.filter((t) => t.completed).length;
+
     if (tasksForDay.length > maxPerDay) {
       console.warn(
-        `Warning: ${dateKey} has ${tasksForDay.length} tasks (exceeds max ${maxPerDay})`,
+        `Warning: ${dateKey} has ${tasksForDay.length} tasks (${incompleteCount} incomplete, ${completedCount} completed) exceeding max ${maxPerDay}`,
       );
     }
   });
@@ -417,6 +439,7 @@ export function assignStartDates(
       isRecurring: t.isRecurring,
       recurringInterval: t.recurringInterval,
       recurringDays: t.recurringDays,
+      completed: t.completed,
     })),
   );
 
