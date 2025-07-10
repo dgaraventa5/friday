@@ -167,7 +167,8 @@ function shouldRecurringTaskAppearOnDate(
     (otherTask) =>
       otherTask.name === task.name &&
       otherTask.completed &&
-      getDateKey(otherTask.dueDate) === dateKey,
+      (getDateKey(otherTask.dueDate) === dateKey ||
+        getDateKey(otherTask.startDate) === dateKey),
   );
 
   if (hasCompletedTaskOnSameDay) {
