@@ -120,6 +120,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
               ...task,
               completed: !task.completed,
               completedAt: !task.completed ? new Date() : undefined,
+              // When marking a task as complete, update its startDate to today
+              // This ensures it's counted in today's tasks for the progress circle
+              startDate: !task.completed
+                ? normalizeDate(new Date())
+                : task.startDate,
             }
           : task,
       );

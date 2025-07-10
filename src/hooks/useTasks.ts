@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Task, Category, UserPreferences } from '../types/task';
-import { 
-  saveTasks, 
-  loadTasks, 
-  saveCategories, 
-  loadCategories, 
-  savePreferences, 
-  loadPreferences 
+import {
+  saveTasks,
+  loadTasks,
+  saveCategories,
+  loadCategories,
+  savePreferences,
+  loadPreferences,
 } from '../utils/localStorage';
-import { getTopDailyTasks, checkCategoryLimits } from '../utils/taskPrioritization';
-import { getNextRecurringDate } from '../utils/dateUtils';
+import {
+  getTopDailyTasks,
+  checkCategoryLimits,
+} from '../utils/taskPrioritization';
+import { getNextRecurringDate, normalizeDate } from '../utils/dateUtils';
 
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -22,7 +25,7 @@ export function useTasks() {
     const loadedTasks = loadTasks();
     const loadedCategories = loadCategories();
     const loadedPreferences = loadPreferences();
-    
+
     setTasks(loadedTasks);
     setCategories(loadedCategories);
     setPreferences(loadedPreferences);
@@ -48,7 +51,9 @@ export function useTasks() {
     }
   }, [preferences, loading]);
 
-  const addTask = (taskData: Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt'>) => {
+  const addTask = (
+    taskData: Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt'>,
+  ) => {
     // Check category limits
     const limitCheck = checkCategoryLimits(tasks, { ...taskData } as Task);
     if (!limitCheck.allowed) {
@@ -64,61 +69,70 @@ export function useTasks() {
       updatedAt: new Date(),
     };
 
-    setTasks(prev => [...prev, newTask]);
+    setTasks((prev) => [...prev, newTask]);
     return true;
   };
 
   const toggleTaskComplete = (taskId: string) => {
-    setTasks(prev => prev.map(task => {
-      if (task.id === taskId) {
-        const updatedTask = {
-          ...task,
-          completed: !task.completed,
-          completedAt: !task.completed ? new Date() : undefined,
-          updatedAt: new Date(),
-        };
-
-        // Handle recurring tasks
-        if (!task.completed && task.isRecurring && task.recurringInterval) {
-          // Create next occurrence
-          const nextDueDate = getNextRecurringDate(
-            task.dueDate, 
-            task.recurringInterval, 
-            task.recurringDays
-          );
-          
-          const recurringTask: Task = {
+    setTasks((prev) =>
+      prev.map((task) => {
+        if (task.id === taskId) {
+          const updatedTask = {
             ...task,
-            id: crypto.randomUUID(),
-            completed: false,
-            dueDate: nextDueDate,
-            createdAt: new Date(),
+            completed: !task.completed,
+            completedAt: !task.completed ? new Date() : undefined,
             updatedAt: new Date(),
-            completedAt: undefined,
+            // When marking a task as complete, update its startDate to today
+            // This ensures it's counted in today's tasks for the progress circle
+            startDate: !task.completed
+              ? normalizeDate(new Date())
+              : task.startDate,
           };
 
-          // Add the new recurring task
-          setTimeout(() => {
-            setTasks(current => [...current, recurringTask]);
-          }, 100);
-        }
+          // Handle recurring tasks
+          if (!task.completed && task.isRecurring && task.recurringInterval) {
+            // Create next occurrence
+            const nextDueDate = getNextRecurringDate(
+              task.dueDate,
+              task.recurringInterval,
+              task.recurringDays,
+            );
 
-        return updatedTask;
-      }
-      return task;
-    }));
+            const recurringTask: Task = {
+              ...task,
+              id: crypto.randomUUID(),
+              completed: false,
+              dueDate: nextDueDate,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              completedAt: undefined,
+            };
+
+            // Add the new recurring task
+            setTimeout(() => {
+              setTasks((current) => [...current, recurringTask]);
+            }, 100);
+          }
+
+          return updatedTask;
+        }
+        return task;
+      }),
+    );
   };
 
   const deleteTask = (taskId: string) => {
-    setTasks(prev => prev.filter(task => task.id !== taskId));
+    setTasks((prev) => prev.filter((task) => task.id !== taskId));
   };
 
   const updateTask = (taskId: string, updates: Partial<Task>) => {
-    setTasks(prev => prev.map(task => 
-      task.id === taskId 
-        ? { ...task, ...updates, updatedAt: new Date() }
-        : task
-    ));
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === taskId
+          ? { ...task, ...updates, updatedAt: new Date() }
+          : task,
+      ),
+    );
   };
 
   const getTodayTasks = () => {
@@ -126,7 +140,7 @@ export function useTasks() {
   };
 
   const getIncompleteTasks = () => {
-    return tasks.filter(task => !task.completed);
+    return tasks.filter((task) => !task.completed);
   };
 
   const updateCategories = (newCategories: Category[]) => {

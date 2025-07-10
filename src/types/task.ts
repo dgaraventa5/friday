@@ -33,9 +33,18 @@ export interface UserPreferences {
   categories: Category[];
   theme: 'light' | 'dark';
   notifications: boolean;
+  defaultView?: string;
+  notificationsEnabled?: boolean;
+  emailNotifications?: boolean;
+  defaultCategory?: string;
+  [key: string]: unknown; // Allow for additional preference fields
 }
 
-export type EisenhowerQuadrant = 'urgent-important' | 'not-urgent-important' | 'urgent-not-important' | 'not-urgent-not-important';
+export type EisenhowerQuadrant =
+  | 'urgent-important'
+  | 'not-urgent-important'
+  | 'urgent-not-important'
+  | 'not-urgent-not-important';
 
 export interface TaskScore {
   taskId: string;
