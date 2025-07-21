@@ -122,7 +122,7 @@ export function TaskInput({
     return (
       <button
         onClick={onCancel}
-        className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-neutral-50 rounded-lg text-neutral-600 hover:border-primary-500 hover:text-primary-600 transition-all duration-200 group"
+        className="w-full flex items-center justify-center gap-2 p-3 sm:p-4 border-2 border-dashed border-neutral-50 rounded-lg text-neutral-600 hover:border-primary-500 hover:text-primary-600 transition-all duration-200 group"
       >
         <Plus className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
         <span className="font-medium">Add a task</span>
@@ -132,18 +132,21 @@ export function TaskInput({
 
   // Render the add task form
   return (
-    <div className="bg-[#f7f7f7] rounded-lg border border-neutral-50 shadow-card p-4 animate-slide-up max-h-[calc(100vh-48px)] overflow-y-auto">
+    <div className="bg-[#f7f7f7] rounded-lg border border-neutral-50 shadow-card p-3 sm:p-4 animate-slide-up max-h-[calc(100vh-24px)] overflow-y-auto">
       <form onSubmit={handleSubmit} className="space-y-3 w-full">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xl font-bold text-neutral-900">Add New Task</h3>
+          <h3 className="text-lg sm:text-xl font-bold text-neutral-900">
+            Add New Task
+          </h3>
           <Button
             type="button"
             onClick={handleCancel}
             variant="secondary"
             icon
             aria-label="Cancel"
+            className="w-8 h-8 sm:w-9 sm:h-9"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
         </div>
 
@@ -158,7 +161,7 @@ export function TaskInput({
           required
           error={errors.find((e) => e.field === 'name')?.message}
           placeholder="What needs to be done?"
-          className="text-base py-2 px-3 h-12"
+          className="text-base py-2 px-3 h-10 sm:h-12"
         />
 
         {/* Category Field */}
@@ -177,10 +180,10 @@ export function TaskInput({
           }
           required
           error={errors.find((e) => e.field === 'category')?.message}
-          className="text-base py-2 px-3 h-12"
+          className="text-base py-2 px-3 h-10 sm:h-12"
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Due Date Field */}
           <FormField
             label="Due Date"
@@ -191,7 +194,7 @@ export function TaskInput({
             }
             required
             error={errors.find((e) => e.field === 'dueDate')?.message}
-            className="text-base py-2 px-3 h-12"
+            className="text-base py-2 px-3 h-10 sm:h-12"
           />
 
           {/* Estimated Hours Field */}
@@ -207,11 +210,11 @@ export function TaskInput({
             step="0.25"
             required
             error={errors.find((e) => e.field === 'estimatedHours')?.message}
-            className="text-base py-2 px-3 h-12"
+            className="text-base py-2 px-3 h-10 sm:h-12"
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Importance Field */}
           <FormField
             label="Importance"
@@ -225,7 +228,7 @@ export function TaskInput({
             }
             required
             error={errors.find((e) => e.field === 'importance')?.message}
-            className="text-base py-2 px-3 h-12"
+            className="text-base py-2 px-3 h-10 sm:h-12"
           />
 
           {/* Urgency Field */}
@@ -241,21 +244,21 @@ export function TaskInput({
             }
             required
             error={errors.find((e) => e.field === 'urgency')?.message}
-            className="text-base py-2 px-3 h-12"
+            className="text-base py-2 px-3 h-10 sm:h-12"
           />
         </div>
 
-        {/* Recurring Task Checkbox */}
-        <label className="flex items-center gap-3 min-h-[36px] cursor-pointer select-none">
+        {/* Recurring Task Checkbox - larger touch target */}
+        <label className="flex items-center gap-2 sm:gap-3 min-h-[36px] cursor-pointer select-none">
           <input
             type="checkbox"
             checked={task.isRecurring}
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
               handleChange('isRecurring', e.target.checked)
             }
-            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
+            className="h-5 w-5 sm:h-4 sm:w-4 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
           />
-          <span className="text-sm text-neutral-900  text-left">
+          <span className="text-sm text-neutral-900 text-left">
             This is a recurring task
           </span>
         </label>
@@ -278,16 +281,16 @@ export function TaskInput({
               error={
                 errors.find((e) => e.field === 'recurringInterval')?.message
               }
-              className="text-base py-2 px-3 h-12"
+              className="text-base py-2 px-3 h-10 sm:h-12"
             />
 
-            {/* Weekly Recurring Days */}
+            {/* Weekly Recurring Days - better spacing for touch */}
             {task.recurringInterval === 'weekly' && (
               <div>
-                <label className="block text-sm font-medium text-neutral-600 mb-1 ">
+                <label className="block text-sm font-medium text-neutral-600 mb-1">
                   Recurring Days
                 </label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
                     (day, index) => (
                       <label key={day} className="inline-flex items-center">
@@ -301,9 +304,9 @@ export function TaskInput({
                               : days.filter((d) => d !== index);
                             handleChange('recurringDays', newDays);
                           }}
-                          className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
+                          className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
                         />
-                        <span className="ml-1 text-xs text-neutral-600 ">
+                        <span className="ml-2 sm:ml-1 text-sm sm:text-xs text-neutral-600">
                           {day}
                         </span>
                       </label>
@@ -318,21 +321,21 @@ export function TaskInput({
               </div>
             )}
 
-            {/* End Repeat Options */}
+            {/* End Repeat Options - better spacing for touch */}
             <div>
-              <label className="block text-sm font-medium text-neutral-600 mb-1 ">
+              <label className="block text-sm font-medium text-neutral-600 mb-1">
                 End Repeat
               </label>
-              <div className="space-y-1">
+              <div className="space-y-2 sm:space-y-1">
                 {/* Never option */}
                 <label className="flex items-center">
                   <input
                     type="radio"
                     checked={task.recurringEndType === 'never'}
                     onChange={() => handleChange('recurringEndType', 'never')}
-                    className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
+                    className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
                   />
-                  <span className="ml-2 text-xs text-neutral-600 ">
+                  <span className="ml-2 text-sm sm:text-xs text-neutral-600">
                     Never
                   </span>
                 </label>
@@ -344,9 +347,9 @@ export function TaskInput({
                       type="radio"
                       checked={task.recurringEndType === 'after'}
                       onChange={() => handleChange('recurringEndType', 'after')}
-                      className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
+                      className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
                     />
-                    <span className="ml-2 text-xs text-neutral-600 ">
+                    <span className="ml-2 text-sm sm:text-xs text-neutral-600">
                       After
                     </span>
                   </label>
@@ -364,9 +367,9 @@ export function TaskInput({
                       )
                     }
                     disabled={task.recurringEndType !== 'after'}
-                    className="ml-2 w-12 h-6 border border-neutral-300 rounded text-xs px-2"
+                    className="ml-2 w-14 h-8 sm:w-12 sm:h-6 border border-neutral-300 rounded text-sm sm:text-xs px-2"
                   />
-                  <span className="ml-1 text-xs text-neutral-600 ">
+                  <span className="ml-1 text-sm sm:text-xs text-neutral-600">
                     time(s)
                   </span>
                 </div>
