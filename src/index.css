@@ -30,3 +30,21 @@
   --header-height: 72px;
   --bottom-nav-height: 64px;
 }
+
+/* Modal improvements */
+.modal-form label {
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+  color: #4b5563;
+}
+
+.modal-form .form-group {
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .modal-form input,
+  .modal-form select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+}

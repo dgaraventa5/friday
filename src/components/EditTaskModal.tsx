@@ -67,9 +67,9 @@ export function EditTaskModal({
   };
 
   return (
-    <div className="bg-[#f7f7f7] rounded-lg border border-neutral-50 shadow-card p-3 sm:p-4 animate-slide-up max-h-[calc(100vh-24px)] overflow-y-auto">
-      <form onSubmit={handleSubmit} className="space-y-3 w-full">
-        <div className="flex items-center justify-between mb-2">
+    <div className="bg-[#f7f7f7] rounded-lg border border-neutral-50 shadow-card animate-slide-up modal-form">
+      <form onSubmit={handleSubmit} className="w-full">
+        <div className="flex items-center justify-between p-3 border-b border-neutral-100">
           <h3 className="text-lg sm:text-xl font-bold text-neutral-900">
             Edit Task
           </h3>
@@ -84,7 +84,8 @@ export function EditTaskModal({
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
         </div>
-
+        
+        <div className="p-3 space-y-4">
         {/* Task Name Field */}
         <FormField
           label="Task Name"
@@ -340,6 +341,7 @@ export function EditTaskModal({
           >
             {isSubmitting ? 'Updating...' : 'Update Task'}
           </Button>
+        </div>
         </div>
       </form>
     </div>

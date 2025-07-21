@@ -27,7 +27,7 @@ export function FormField(props: FormFieldProps) {
   const { label, error, required, helpText, className = '', ...rest } = props;
   const id = useId();
 
-  const baseClasses = "block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm";
+  const baseClasses = "block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base sm:text-sm";
   const errorClasses = error ? "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500" : "";
   const inputClasses = `${baseClasses} ${errorClasses} ${className}`;
 
@@ -63,7 +63,7 @@ export function FormField(props: FormFieldProps) {
 
   return (
     <div>
-      <label id={id + '-label'} htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">
+      <label id={id + '-label'} htmlFor={id} className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
