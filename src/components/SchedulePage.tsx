@@ -51,17 +51,17 @@ export function SchedulePage({
 
   return (
     <PageLayout allowScroll={true}>
-      <div className="flex items-center gap-2 mb-4">
-        <span role="img" aria-label="calendar" className="text-2xl">
+      <div className="flex items-center gap-2 mb-3 sm:mb-4">
+        <span role="img" aria-label="calendar" className="text-xl sm:text-2xl">
           🗓️
         </span>
-        <h1 className="text-2xl font-bold text-neutral-900 ">
-          Full Task Schedule
+        <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">
+          Full Schedule
         </h1>
       </div>
 
       {sortedDates.length === 0 && (
-        <div className="text-center py-12 text-neutral-600 ">
+        <div className="text-center py-8 sm:py-12 text-neutral-600">
           No scheduled tasks yet.
         </div>
       )}
@@ -84,10 +84,10 @@ export function SchedulePage({
         return (
           <div
             key={dateKey}
-            className="bg-white rounded-2xl shadow-card p-4 md:p-6 mb-4"
+            className="bg-white rounded-xl sm:rounded-2xl shadow-card p-3 sm:p-4 md:p-6 mb-3 sm:mb-4"
           >
-            <h2 className="text-lg font-bold text-neutral-800 mb-2 ">
-              {format(dateObj, 'EEE MMM d yyyy')}
+            <h2 className="text-base sm:text-lg font-bold text-neutral-800 mb-2">
+              {format(dateObj, 'EEE, MMM d')}
             </h2>
             <div className="space-y-2">
               {grouped[dateKey].map((task) => (
