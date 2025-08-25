@@ -1,4 +1,8 @@
-import { assignStartDates, prioritizeTasks } from './taskPrioritization';
+import {
+  assignStartDates,
+  prioritizeTasks,
+  calculateTaskScore,
+} from './taskPrioritization';
 import { Task, Category } from '../types/task';
 import { startOfDay, addDays } from 'date-fns';
 
@@ -330,6 +334,18 @@ describe('taskPrioritization', () => {
     });
   });
 
+  describe('calculateTaskScore', () => {
+    it('applies a larger bonus for tasks due today', () => {
+      const todayTask = createTestTask('1', 'Today task', 'Work', 0);
+      const tomorrowTask = createTestTask('2', 'Tomorrow task', 'Work', 1);
+
+      const todayScore = calculateTaskScore(todayTask).score;
+      const tomorrowScore = calculateTaskScore(tomorrowTask).score;
+
+      expect(todayScore).toBeGreaterThan(tomorrowScore);
+    });
+  });
+
   describe('prioritizeTasks', () => {
     it('prioritizes tasks due today over future tasks even with lower score', () => {
       const todayTask = createTestTask('1', 'Today task', 'Work', 0);
@@ -341,6 +357,14 @@ describe('taskPrioritization', () => {
       futureTask.urgency = 'urgent';
 
       const result = prioritizeTasks([futureTask, todayTask]);
+      expect(result[0].id).toBe(todayTask.id);
+    });
+
+    it('ranks tasks due today ahead of tasks due soon', () => {
+      const todayTask = createTestTask('1', 'Today task', 'Work', 0);
+      const tomorrowTask = createTestTask('2', 'Tomorrow task', 'Work', 1);
+
+      const result = prioritizeTasks([tomorrowTask, todayTask]);
       expect(result[0].id).toBe(todayTask.id);
     });
   });
