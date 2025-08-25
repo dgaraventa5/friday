@@ -72,21 +72,23 @@ function getPriorityLevel(score: number): number {
 // Sort tasks by score (highest first), then by due date (earliest first)
 export function prioritizeTasks(tasks: Task[]): Task[] {
   const incompleteTasks = tasks.filter((task) => !task.completed);
-  const taskScores = incompleteTasks.map(calculateTaskScore);
 
-  // Sort by score (highest first), then by due date (earliest first)
-  taskScores.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
+  const todayTasks = incompleteTasks.filter((t) => isToday(t.dueDate));
+  const otherTasks = incompleteTasks.filter((t) => !isToday(t.dueDate));
 
-    const taskA = incompleteTasks.find((t) => t.id === a.taskId)!;
-    const taskB = incompleteTasks.find((t) => t.id === b.taskId)!;
+  const sortByScoreThenDate = (taskList: Task[]): Task[] =>
+    taskList
+      .map((task) => ({ task, score: calculateTaskScore(task).score }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.task.dueDate.getTime() - b.task.dueDate.getTime();
+      })
+      .map(({ task }) => task);
 
-    return taskA.dueDate.getTime() - taskB.dueDate.getTime();
-  });
+  const sortedToday = sortByScoreThenDate(todayTasks);
+  const sortedOther = sortByScoreThenDate(otherTasks);
 
-  return taskScores.map(
-    (score) => incompleteTasks.find((task) => task.id === score.taskId)!,
-  );
+  return [...sortedToday, ...sortedOther];
 }
 
 // Select up to 4 top-priority tasks for "Today's Focus" (used for sticky focus set)

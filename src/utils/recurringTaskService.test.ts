@@ -115,8 +115,8 @@ describe('Recurring Task Service', () => {
       
       // The next due date should be the next day in the recurringDays array
       // Since today is Thursday (index 4), the next day should be Monday (index 1)
-      // This is actually just 1 day later in this test since we're using mock dates
-      expect(nextTask?.dueDate).toEqual(addDays(weeklyTask.dueDate, 1));
+      // which is 4 days later
+      expect(nextTask?.dueDate).toEqual(addDays(weeklyTask.dueDate, 4));
     });
 
     it('should generate next monthly task correctly', () => {

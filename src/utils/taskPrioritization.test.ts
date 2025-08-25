@@ -1,4 +1,4 @@
-import { assignStartDates } from './taskPrioritization';
+import { assignStartDates, prioritizeTasks } from './taskPrioritization';
 import { Task, Category } from '../types/task';
 import { startOfDay, addDays } from 'date-fns';
 
@@ -327,6 +327,21 @@ describe('taskPrioritization', () => {
         expect(task.startDate.getSeconds()).toBe(0);
         expect(task.startDate.getMilliseconds()).toBe(0);
       });
+    });
+  });
+
+  describe('prioritizeTasks', () => {
+    it('prioritizes tasks due today over future tasks even with lower score', () => {
+      const todayTask = createTestTask('1', 'Today task', 'Work', 0);
+      todayTask.importance = 'not-important';
+      todayTask.urgency = 'not-urgent';
+
+      const futureTask = createTestTask('2', 'Future task', 'Work', 1);
+      futureTask.importance = 'important';
+      futureTask.urgency = 'urgent';
+
+      const result = prioritizeTasks([futureTask, todayTask]);
+      expect(result[0].id).toBe(todayTask.id);
     });
   });
 });
