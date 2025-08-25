@@ -113,7 +113,7 @@ Performance budget: <2.5 s LCP; <0.1 CLS; <100 ms TTI for repeated actions.
 - **Color contrast ≥ 4.5:1** for text < 24 px.
 - **Keyboard nav**: all interactive elements `tabindex=0`, visible focus
   outline.
-- **Screen‑reader labels**: `aria‑label` or `aria‑-labelledby` on all form
+- **Screen‑reader labels**: `aria-label` or `aria-labelledby` on all form
   inputs & icons.
 - **Motion preference**: respect `prefers‑reduced‑motion`, reduce duration to 1
   ms + opacity fade.
