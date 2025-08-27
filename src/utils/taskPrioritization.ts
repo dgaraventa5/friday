@@ -41,15 +41,25 @@ export function calculateTaskScore(task: Task): TaskScore {
   // Boost score for overdue tasks
   const overdueBonus = daysOverdue * 10;
 
-  // Boost score for tasks due soon
-  const dueSoonBonus = daysToDue <= 1 ? 20 : daysToDue <= 3 ? 10 : 0;
+  // Extra boost for tasks due today (higher than generic "due soon" bonus)
+  const dueTodayBonus = isToday(task.dueDate) ? 40 : 0;
+
+  // Boost score for tasks due soon (but not today)
+  const dueSoonBonus = !isToday(task.dueDate)
+    ? daysToDue <= 1
+      ? 20
+      : daysToDue <= 3
+      ? 10
+      : 0
+    : 0;
 
   // Boost score for tasks created longer ago (prevents procrastination)
   const daysSinceCreated = differenceInDays(new Date(), task.createdAt);
   const ageBonus = Math.min(daysSinceCreated * 2, 20);
 
   // Calculate final score
-  const finalScore = baseScore + overdueBonus + dueSoonBonus + ageBonus;
+  const finalScore =
+    baseScore + overdueBonus + dueSoonBonus + dueTodayBonus + ageBonus;
 
   return {
     taskId: task.id,
