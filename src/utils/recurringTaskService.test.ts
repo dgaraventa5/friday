@@ -110,13 +110,36 @@ describe('Recurring Task Service', () => {
         recurringInterval: 'weekly',
         recurringDays: [1, 4] // Monday and Thursday
       });
-      
+
       const nextTask = generateNextRecurringTask(weeklyTask);
-      
-      // The next due date should be the next day in the recurringDays array
-      // Since today is Thursday (index 4), the next day should be Monday (index 1)
-      // This is actually just 1 day later in this test since we're using mock dates
-      expect(nextTask?.dueDate).toEqual(addDays(weeklyTask.dueDate, 1));
+
+      const currentDay = weeklyTask.dueDate.getDay();
+      const diffs = (weeklyTask.recurringDays || [])
+        .map((day) => (day + 7 - currentDay) % 7)
+        .filter((diff) => diff > 0);
+      const daysToNext = diffs.length > 0 ? Math.min(...diffs) : 7;
+      const expectedDate = addDays(weeklyTask.dueDate, daysToNext);
+
+      expect(nextTask?.dueDate).toEqual(expectedDate);
+    });
+
+    it('should handle weekly tasks where the next occurrence is the same weekday next week', () => {
+      const weeklyTask = createMockTask({
+        dueDate: new Date('2023-06-12'), // A Monday
+        recurringInterval: 'weekly',
+        recurringDays: [1] // Only Monday
+      });
+
+      const nextTask = generateNextRecurringTask(weeklyTask);
+
+      const currentDay = weeklyTask.dueDate.getDay();
+      const diffs = (weeklyTask.recurringDays || [])
+        .map((day) => (day + 7 - currentDay) % 7)
+        .filter((diff) => diff > 0);
+      const daysToNext = diffs.length > 0 ? Math.min(...diffs) : 7;
+      const expectedDate = addDays(weeklyTask.dueDate, daysToNext);
+
+      expect(nextTask?.dueDate).toEqual(expectedDate);
     });
 
     it('should generate next monthly task correctly', () => {
