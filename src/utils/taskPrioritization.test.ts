@@ -368,4 +368,18 @@ describe('taskPrioritization', () => {
       expect(result[0].id).toBe(todayTask.id);
     });
   });
+
+  describe('prioritizeTasks due date precedence', () => {
+    it('returns tasks due today before higher scoring future tasks', () => {
+      const todayTask = createTestTask('today', 'Low priority today task', 'Work', 0);
+      todayTask.importance = 'not-important';
+      todayTask.urgency = 'not-urgent';
+
+      const futureTask1 = createTestTask('future1', 'Future task 1', 'Work', 3);
+      const futureTask2 = createTestTask('future2', 'Future task 2', 'Home', 2);
+
+      const result = prioritizeTasks([futureTask1, todayTask, futureTask2]);
+      expect(result[0].id).toBe(todayTask.id);
+    });
+  });
 });
