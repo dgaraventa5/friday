@@ -39,6 +39,8 @@ export function TaskInput({
   const [errors, setErrors] = useState<ValidationError[]>([]);
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Toggle for additional options section
+  const [showRecurrence, setShowRecurrence] = useState(false);
 
   // Handle field changes and clear errors for that field
   const handleChange = (field: keyof Task, value: Task[keyof Task]) => {
@@ -133,11 +135,10 @@ export function TaskInput({
   // Render the add task form
   return (
     <div className="bg-[#f7f7f7] rounded-lg border border-neutral-50 shadow-card animate-slide-up modal-form">
-      <form onSubmit={handleSubmit} className="w-full">
+      <form onSubmit={handleSubmit} className="w-full flex flex-col max-h-[90vh]">
+        {/* Header */}
         <div className="flex items-center justify-between p-3 border-b border-neutral-100">
-          <h3 className="text-lg sm:text-xl font-bold text-neutral-900">
-            Add New Task
-          </h3>
+          <h3 className="text-lg sm:text-xl font-bold text-neutral-900">Add New Task</h3>
           <Button
             type="button"
             onClick={handleCancel}
@@ -149,238 +150,291 @@ export function TaskInput({
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
         </div>
-        
-        <div className="p-3 space-y-4">
-        {/* Task Name Field */}
-        <FormField
-          label="Task Name"
-          type="text"
-          value={task.name}
-          onChange={(e: ChangeEvent<HTMLInputElement>) =>
-            handleChange('name', e.target.value)
-          }
-          required
-          error={errors.find((e) => e.field === 'name')?.message}
-          placeholder="What needs to be done?"
-          className="text-base py-2 px-3 h-10 sm:h-12"
-        />
 
-        {/* Category Field */}
-        <FormField
-          label="Category"
-          options={categories.map((cat) => ({
-            value: cat.id,
-            label: cat.name,
-          }))}
-          value={task.category?.id}
-          onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-            handleChange(
-              'category',
-              categories.find((c) => c.id === e.target.value),
-            )
-          }
-          required
-          error={errors.find((e) => e.field === 'category')?.message}
-          className="text-base py-2 px-3 h-10 sm:h-12"
-        />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          {/* Due Date Field */}
-          <FormField
-            label="Due Date"
-            type="date"
-            value={task.dueDate?.toISOString().split('T')[0]}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              handleChange('dueDate', new Date(e.target.value))
-            }
-            required
-            error={errors.find((e) => e.field === 'dueDate')?.message}
-            className="text-base py-2 px-3 h-10 sm:h-12"
-          />
-
-          {/* Estimated Hours Field */}
-          <FormField
-            label="Estimated Hours"
-            type="number"
-            value={task.estimatedHours}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              handleChange('estimatedHours', parseFloat(e.target.value))
-            }
-            min="0.25"
-            max="24"
-            step="0.25"
-            required
-            error={errors.find((e) => e.field === 'estimatedHours')?.message}
-            className="text-base py-2 px-3 h-10 sm:h-12"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          {/* Importance Field */}
-          <FormField
-            label="Importance"
-            options={[
-              { value: 'important', label: 'Important' },
-              { value: 'not-important', label: 'Not Important' },
-            ]}
-            value={task.importance}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-              handleChange('importance', e.target.value)
-            }
-            required
-            error={errors.find((e) => e.field === 'importance')?.message}
-            className="text-base py-2 px-3 h-10 sm:h-12"
-          />
-
-          {/* Urgency Field */}
-          <FormField
-            label="Urgency"
-            options={[
-              { value: 'urgent', label: 'Urgent' },
-              { value: 'not-urgent', label: 'Not Urgent' },
-            ]}
-            value={task.urgency}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-              handleChange('urgency', e.target.value)
-            }
-            required
-            error={errors.find((e) => e.field === 'urgency')?.message}
-            className="text-base py-2 px-3 h-10 sm:h-12"
-          />
-        </div>
-
-        {/* Recurring Task Checkbox - larger touch target */}
-        <label className="flex items-center gap-2 sm:gap-3 min-h-[36px] cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={task.isRecurring}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              handleChange('isRecurring', e.target.checked)
-            }
-            className="h-5 w-5 sm:h-4 sm:w-4 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
-          />
-          <span className="text-sm text-neutral-900 text-left">
-            This is a recurring task
-          </span>
-        </label>
-
-        {/* Recurring Task Details */}
-        {task.isRecurring && (
-          <div className="space-y-3">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-6">
+          {/* Basics */}
+          <section className="space-y-3 border-b border-neutral-100 pb-3">
+            <h4 className="text-sm font-semibold text-neutral-700">Basics</h4>
             <FormField
-              label="Recurring Interval"
-              options={[
-                { value: 'daily', label: 'Daily' },
-                { value: 'weekly', label: 'Weekly' },
-                { value: 'monthly', label: 'Monthly' },
-              ]}
-              value={task.recurringInterval}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                handleChange('recurringInterval', e.target.value)
+              label="Task Name"
+              type="text"
+              value={task.name}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                handleChange('name', e.target.value)
               }
               required
-              error={
-                errors.find((e) => e.field === 'recurringInterval')?.message
-              }
+              error={errors.find((e) => e.field === 'name')?.message}
+              placeholder="What needs to be done?"
               className="text-base py-2 px-3 h-10 sm:h-12"
             />
 
-            {/* Weekly Recurring Days - better spacing for touch */}
-            {task.recurringInterval === 'weekly' && (
+            <FormField
+              label="Category"
+              options={categories.map((cat) => ({
+                value: cat.id,
+                label: cat.name,
+              }))}
+              value={task.category?.id}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                handleChange(
+                  'category',
+                  categories.find((c) => c.id === e.target.value),
+                )
+              }
+              required
+              error={errors.find((e) => e.field === 'category')?.message}
+              className="text-base py-2 px-3 h-10 sm:h-12"
+            />
+          </section>
+
+          {/* Time */}
+          <section className="space-y-3 border-b border-neutral-100 pb-3">
+            <h4 className="text-sm font-semibold text-neutral-700">Time</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <FormField
+                label="Due Date"
+                type="date"
+                value={task.dueDate?.toISOString().split('T')[0]}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  handleChange('dueDate', new Date(e.target.value))
+                }
+                required
+                error={errors.find((e) => e.field === 'dueDate')?.message}
+                className="text-base py-2 px-3 h-10 sm:h-12"
+              />
+
+              <FormField
+                label="Estimated Hours"
+                type="number"
+                value={task.estimatedHours}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  handleChange('estimatedHours', parseFloat(e.target.value))
+                }
+                min="0.25"
+                max="24"
+                step="0.25"
+                required
+                error={errors.find((e) => e.field === 'estimatedHours')?.message}
+                className="text-base py-2 px-3 h-10 sm:h-12"
+              />
+            </div>
+          </section>
+
+          {/* Priority */}
+          <section className="space-y-3">
+            <h4 className="text-sm font-semibold text-neutral-700">Priority</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              {/* Importance segmented control */}
               <div>
-                <label className="block text-sm font-medium text-neutral-600 mb-1">
-                  Recurring Days
+                <label className="block text-xs sm:text-sm font-medium text-neutral-700 mb-1">
+                  Importance<span className="text-red-500 ml-1">*</span>
                 </label>
-                <div className="flex flex-wrap gap-3">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
-                    (day, index) => (
-                      <label key={day} className="inline-flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={task.recurringDays?.includes(index)}
-                          onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                            const days = task.recurringDays || [];
-                            const newDays = e.target.checked
-                              ? [...days, index]
-                              : days.filter((d) => d !== index);
-                            handleChange('recurringDays', newDays);
-                          }}
-                          className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
-                        />
-                        <span className="ml-2 sm:ml-1 text-sm sm:text-xs text-neutral-600">
-                          {day}
-                        </span>
-                      </label>
-                    ),
-                  )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={`flex-1 px-2 py-1 rounded-md border text-sm transition-colors ${
+                      task.importance === 'important'
+                        ? 'bg-red-100 border-red-300 text-red-700'
+                        : 'bg-white border-neutral-300 text-neutral-600'
+                    }`}
+                    onClick={() => handleChange('importance', 'important')}
+                  >
+                    Important
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 px-2 py-1 rounded-md border text-sm transition-colors ${
+                      task.importance === 'not-important'
+                        ? 'bg-green-100 border-green-300 text-green-700'
+                        : 'bg-white border-neutral-300 text-neutral-600'
+                    }`}
+                    onClick={() => handleChange('importance', 'not-important')}
+                  >
+                    Not Important
+                  </button>
                 </div>
-                {errors.find((e) => e.field === 'recurringDays')?.message && (
+                {errors.find((e) => e.field === 'importance')?.message && (
                   <p className="mt-1 text-xs text-red-600">
-                    {errors.find((e) => e.field === 'recurringDays')?.message}
+                    {errors.find((e) => e.field === 'importance')?.message}
                   </p>
                 )}
               </div>
-            )}
 
-            {/* End Repeat Options - better spacing for touch */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-600 mb-1">
-                End Repeat
-              </label>
-              <div className="space-y-2 sm:space-y-1">
-                {/* Never option */}
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    checked={task.recurringEndType === 'never'}
-                    onChange={() => handleChange('recurringEndType', 'never')}
-                    className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
-                  />
-                  <span className="ml-2 text-sm sm:text-xs text-neutral-600">
-                    Never
-                  </span>
+              {/* Urgency segmented control */}
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-neutral-700 mb-1">
+                  Urgency<span className="text-red-500 ml-1">*</span>
                 </label>
-
-                {/* After option with count input */}
-                <div className="flex items-center">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      checked={task.recurringEndType === 'after'}
-                      onChange={() => handleChange('recurringEndType', 'after')}
-                      className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
-                    />
-                    <span className="ml-2 text-sm sm:text-xs text-neutral-600">
-                      After
-                    </span>
-                  </label>
-
-                  {/* Count input - only enabled when 'after' is selected */}
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={task.recurringEndCount || 1}
-                    onChange={(e) =>
-                      handleChange(
-                        'recurringEndCount',
-                        parseInt(e.target.value, 10),
-                      )
-                    }
-                    disabled={task.recurringEndType !== 'after'}
-                    className="ml-2 w-14 h-8 sm:w-12 sm:h-6 border border-neutral-300 rounded text-sm sm:text-xs px-2"
-                  />
-                  <span className="ml-1 text-sm sm:text-xs text-neutral-600">
-                    time(s)
-                  </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={`flex-1 px-2 py-1 rounded-md border text-sm transition-colors ${
+                      task.urgency === 'urgent'
+                        ? 'bg-amber-100 border-amber-300 text-amber-700'
+                        : 'bg-white border-neutral-300 text-neutral-600'
+                    }`}
+                    onClick={() => handleChange('urgency', 'urgent')}
+                  >
+                    Urgent
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 px-2 py-1 rounded-md border text-sm transition-colors ${
+                      task.urgency === 'not-urgent'
+                        ? 'bg-green-100 border-green-300 text-green-700'
+                        : 'bg-white border-neutral-300 text-neutral-600'
+                    }`}
+                    onClick={() => handleChange('urgency', 'not-urgent')}
+                  >
+                    Not Urgent
+                  </button>
                 </div>
+                {errors.find((e) => e.field === 'urgency')?.message && (
+                  <p className="mt-1 text-xs text-red-600">
+                    {errors.find((e) => e.field === 'urgency')?.message}
+                  </p>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          </section>
 
-        {/* Submit Button */}
-        <div className="flex justify-center mt-4">
+          {/* More options / Recurrence section */}
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowRecurrence((s) => !s)}
+              className="text-sm text-primary-600 hover:underline"
+            >
+              {showRecurrence ? 'Hide options' : 'More options'}
+            </button>
+          </div>
+
+          {showRecurrence && (
+            <section className="space-y-3 border-t border-neutral-200 pt-3">
+              <h4 className="text-sm font-semibold text-neutral-700">Recurrence</h4>
+              <label className="flex items-center gap-2 sm:gap-3 min-h-[36px] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={task.isRecurring}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    handleChange('isRecurring', e.target.checked)
+                  }
+                  className="h-5 w-5 sm:h-4 sm:w-4 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
+                />
+                <span className="text-sm text-neutral-900">Enable recurrence</span>
+              </label>
+
+              {task.isRecurring && (
+                <div className="space-y-3">
+                  <FormField
+                    label="Recurring Interval"
+                    options={[
+                      { value: 'daily', label: 'Daily' },
+                      { value: 'weekly', label: 'Weekly' },
+                      { value: 'monthly', label: 'Monthly' },
+                    ]}
+                    value={task.recurringInterval}
+                    onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                      handleChange('recurringInterval', e.target.value)
+                    }
+                    required
+                    error={
+                      errors.find((e) => e.field === 'recurringInterval')?.message
+                    }
+                    className="text-base py-2 px-3 h-10 sm:h-12"
+                  />
+
+                  {task.recurringInterval === 'weekly' && (
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-600 mb-1">
+                        Recurring Days
+                      </label>
+                      <div className="flex flex-wrap gap-3">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                          (day, index) => (
+                            <label key={day} className="inline-flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={task.recurringDays?.includes(index)}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                  const days = task.recurringDays || [];
+                                  const newDays = e.target.checked
+                                    ? [...days, index]
+                                    : days.filter((d) => d !== index);
+                                  handleChange('recurringDays', newDays);
+                                }}
+                                className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
+                              />
+                              <span className="ml-2 sm:ml-1 text-sm sm:text-xs text-neutral-600">
+                                {day}
+                              </span>
+                            </label>
+                          ),
+                        )}
+                      </div>
+                      {errors.find((e) => e.field === 'recurringDays')?.message && (
+                        <p className="mt-1 text-xs text-red-600">
+                          {errors.find((e) => e.field === 'recurringDays')?.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* End Repeat Options */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-600 mb-1">
+                      End Repeat
+                    </label>
+                    <div className="space-y-2 sm:space-y-1">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          checked={task.recurringEndType === 'never'}
+                          onChange={() => handleChange('recurringEndType', 'never')}
+                          className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
+                        />
+                        <span className="ml-2 text-sm sm:text-xs text-neutral-600">Never</span>
+                      </label>
+
+                      <div className="flex items-center">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            checked={task.recurringEndType === 'after'}
+                            onChange={() => handleChange('recurringEndType', 'after')}
+                            className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50"
+                          />
+                          <span className="ml-2 text-sm sm:text-xs text-neutral-600">
+                            After
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={task.recurringEndCount || 1}
+                          onChange={(e) =>
+                            handleChange(
+                              'recurringEndCount',
+                              parseInt(e.target.value, 10),
+                            )
+                          }
+                          disabled={task.recurringEndType !== 'after'}
+                          className="ml-2 w-14 h-8 sm:w-12 sm:h-6 border border-neutral-300 rounded text-sm sm:text-xs px-2"
+                        />
+                        <span className="ml-1 text-sm sm:text-xs text-neutral-600">time(s)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-3 border-t border-neutral-100 bg-[#f7f7f7]">
           <Button
             type="submit"
             disabled={isSubmitting}
@@ -389,7 +443,6 @@ export function TaskInput({
           >
             {isSubmitting ? 'Adding...' : 'Add Task'}
           </Button>
-        </div>
         </div>
       </form>
     </div>
