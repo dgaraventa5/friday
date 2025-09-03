@@ -167,43 +167,25 @@ function shouldRecurringTaskAppearOnDate(
     return true; // Non-recurring tasks follow normal scheduling
   }
 
-  // If the task's dueDate is the same as the date we're checking, it should appear
+  // Recurring tasks should only appear on the specific day they are scheduled for.
+  // If the task's dueDate matches the date being evaluated, show it (unless there's
+  // already a completed task with the same name on that day).
   if (isSameNormalizedDay(task.dueDate, date)) {
-    return true;
+    const dateKey = getDateKey(date);
+    const hasCompletedTaskOnSameDay = allTasks.some(
+      (otherTask) =>
+        otherTask.name === task.name &&
+        otherTask.completed &&
+        (getDateKey(otherTask.dueDate) === dateKey ||
+          getDateKey(otherTask.startDate) === dateKey),
+    );
+
+    return !hasCompletedTaskOnSameDay;
   }
 
-  // Check if there's already a completed task with the same name on this date
-  // This prevents new recurring tasks from appearing on the same day after completion
-  const dateKey = getDateKey(date);
-  const hasCompletedTaskOnSameDay = allTasks.some(
-    (otherTask) =>
-      otherTask.name === task.name &&
-      otherTask.completed &&
-      (getDateKey(otherTask.dueDate) === dateKey ||
-        getDateKey(otherTask.startDate) === dateKey),
-  );
-
-  if (hasCompletedTaskOnSameDay) {
-    return false;
-  }
-
-  // For recurring tasks, check if the date matches the recurrence pattern
-  switch (task.recurringInterval) {
-    case 'daily':
-      return true; // Daily tasks appear every day
-    case 'weekly':
-      if (task.recurringDays && task.recurringDays.length > 0) {
-        const dayOfWeek = getDay(date); // 0-6, where 0 is Sunday
-        return task.recurringDays.includes(dayOfWeek);
-      }
-      // If no specific days are set, check if it's the same day of week as the original due date
-      return getDay(date) === getDay(task.dueDate);
-    case 'monthly':
-      // Check if it's the same day of the month
-      return date.getDate() === task.dueDate.getDate();
-    default:
-      return false;
-  }
+  // If the task's due date is before or after the date being checked,
+  // it should not roll over or appear on other days.
+  return false;
 }
 
 export function assignStartDates(
