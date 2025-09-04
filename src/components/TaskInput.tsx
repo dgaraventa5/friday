@@ -154,8 +154,7 @@ export function TaskInput({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-3 space-y-6">
           {/* Basics */}
-          <section className="space-y-3 border-b border-neutral-100 pb-3">
-            <h4 className="text-sm font-semibold text-neutral-700">Basics</h4>
+          <section className="space-y-3">
             <FormField
               label="Task Name"
               type="text"
@@ -189,8 +188,7 @@ export function TaskInput({
           </section>
 
           {/* Time */}
-          <section className="space-y-3 border-b border-neutral-100 pb-3">
-            <h4 className="text-sm font-semibold text-neutral-700">Time</h4>
+          <section className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <FormField
                 label="Due Date"
@@ -223,7 +221,6 @@ export function TaskInput({
 
           {/* Priority */}
           <section className="space-y-3">
-            <h4 className="text-sm font-semibold text-neutral-700">Priority</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {/* Importance segmented control */}
               <div>
@@ -311,8 +308,7 @@ export function TaskInput({
           </div>
 
           {showRecurrence && (
-            <section className="space-y-3 border-t border-neutral-200 pt-3">
-              <h4 className="text-sm font-semibold text-neutral-700">Recurrence</h4>
+            <section className="space-y-3">
               <label className="flex items-center gap-2 sm:gap-3 min-h-[36px] cursor-pointer select-none">
                 <input
                   type="checkbox"
