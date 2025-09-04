@@ -2,7 +2,7 @@
 // Utilities for scoring, prioritizing, and selecting daily tasks using the Eisenhower Matrix and other rules.
 
 import { Task, TaskScore, EisenhowerQuadrant } from '../types/task';
-import { isToday, differenceInDays, isPast, getDay } from 'date-fns';
+import { isToday, differenceInDays, isPast } from 'date-fns';
 import { normalizeDate, getDateKey, isSameNormalizedDay } from './dateUtils';
 
 // Calculate a score for a task based on importance, urgency, due date, and age

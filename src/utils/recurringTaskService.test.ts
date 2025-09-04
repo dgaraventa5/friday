@@ -1,6 +1,6 @@
 import { generateNextRecurringTask, handleRecurringTaskCompletion, hasReachedEndOfRecurrence } from './recurringTaskService';
 import { Task, Category } from '../types/task';
-import { addDays, addWeeks, addMonths } from 'date-fns';
+import { addDays, addMonths } from 'date-fns';
 
 // Mock category for testing
 const mockCategory: Category = {
