@@ -124,7 +124,7 @@ export function TaskInput({
     return (
       <button
         onClick={onCancel}
-        className="w-full flex items-center justify-center gap-2 p-3 sm:p-4 border-2 border-dashed border-neutral-50 rounded-lg text-neutral-600 hover:border-primary-500 hover:text-primary-600 transition-all duration-200 group"
+        className="w-full flex items-center justify-center gap-2 p-2 sm:p-3 border-2 border-dashed border-neutral-50 rounded-lg text-neutral-600 hover:border-primary-500 hover:text-primary-600 transition-all duration-200 group"
       >
         <Plus className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
         <span className="font-medium">Add a task</span>
@@ -140,10 +140,8 @@ export function TaskInput({
         className="w-full flex flex-col max-h-[calc(100vh-4rem)]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b border-neutral-100">
-          <h3 className="text-lg sm:text-xl font-bold text-neutral-900">
-            Add New Task
-          </h3>
+        <div className="flex items-center justify-between p-2 sm:p-3 border-b border-neutral-100">
+          <h3 className="text-lg sm:text-xl font-bold text-neutral-900">Add New Task</h3>
           <Button
             type="button"
             onClick={handleCancel}
@@ -157,7 +155,7 @@ export function TaskInput({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-6">
+        <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-4 sm:space-y-6">
           {/* Basics */}
           <section className="space-y-3">
             <FormField
@@ -170,7 +168,7 @@ export function TaskInput({
               required
               error={errors.find((e) => e.field === 'name')?.message}
               placeholder="What needs to be done?"
-              className="text-base py-2 px-3 h-10 sm:h-12"
+              className="text-base py-2 px-3 h-9 sm:h-11"
             />
 
             <FormField
@@ -188,13 +186,15 @@ export function TaskInput({
               }
               required
               error={errors.find((e) => e.field === 'category')?.message}
-              className="text-base py-2 px-3 h-10 sm:h-12"
+              className="text-base py-2 px-3 h-9 sm:h-11"
             />
           </section>
 
           {/* Time */}
-          <section className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+
+          <section className="space-y-3 border-b border-neutral-100 pb-3">
+            <h4 className="text-sm font-semibold text-neutral-700">Time</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
               <FormField
                 label="Due Date"
                 type="date"
@@ -204,7 +204,7 @@ export function TaskInput({
                 }
                 required
                 error={errors.find((e) => e.field === 'dueDate')?.message}
-                className="text-base py-2 px-3 h-10 sm:h-12"
+                className="text-base py-2 px-3 h-9 sm:h-11"
               />
 
               <FormField
@@ -218,17 +218,16 @@ export function TaskInput({
                 max="24"
                 step="0.25"
                 required
-                error={
-                  errors.find((e) => e.field === 'estimatedHours')?.message
-                }
-                className="text-base py-2 px-3 h-10 sm:h-12"
+                error={errors.find((e) => e.field === 'estimatedHours')?.message}
+                className="text-base py-2 px-3 h-9 sm:h-11"
               />
             </div>
           </section>
 
           {/* Priority */}
           <section className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <h4 className="text-sm font-semibold text-neutral-700">Priority</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
               {/* Importance segmented control */}
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-neutral-700 mb-1">
@@ -351,7 +350,7 @@ export function TaskInput({
                       errors.find((e) => e.field === 'recurringInterval')
                         ?.message
                     }
-                    className="text-base py-2 px-3 h-10 sm:h-12"
+                    className="text-base py-2 px-3 h-9 sm:h-11"
                   />
 
                   {task.recurringInterval === 'weekly' && (
@@ -460,12 +459,12 @@ export function TaskInput({
         </div>
 
         {/* Footer */}
-        <div className="p-3 border-t border-neutral-100 bg-[#f7f7f7]">
+        <div className="p-2 sm:p-3 border-t border-neutral-100 bg-[#f7f7f7]">
           <Button
             type="submit"
             disabled={isSubmitting}
             variant="primary"
-            className="w-full py-2 text-sm"
+            className="w-full !px-3 !py-1.5 text-sm sm:!px-4 sm:!py-2"
           >
             {isSubmitting ? 'Adding...' : 'Add Task'}
           </Button>
