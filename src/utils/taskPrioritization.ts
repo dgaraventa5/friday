@@ -2,7 +2,7 @@
 // Utilities for scoring, prioritizing, and selecting daily tasks using the Eisenhower Matrix and other rules.
 
 import { Task, TaskScore, EisenhowerQuadrant } from '../types/task';
-import { isToday, differenceInDays, isPast, getDay } from 'date-fns';
+import { isToday, differenceInDays, isPast } from 'date-fns';
 import { normalizeDate, getDateKey, isSameNormalizedDay } from './dateUtils';
 
 // Calculate a score for a task based on importance, urgency, due date, and age
@@ -41,15 +41,25 @@ export function calculateTaskScore(task: Task): TaskScore {
   // Boost score for overdue tasks
   const overdueBonus = daysOverdue * 10;
 
-  // Boost score for tasks due soon
-  const dueSoonBonus = daysToDue <= 1 ? 20 : daysToDue <= 3 ? 10 : 0;
+  // Extra boost for tasks due today (higher than generic "due soon" bonus)
+  const dueTodayBonus = isToday(task.dueDate) ? 40 : 0;
+
+  // Boost score for tasks due soon (but not today)
+  const dueSoonBonus = !isToday(task.dueDate)
+    ? daysToDue <= 1
+      ? 20
+      : daysToDue <= 3
+      ? 10
+      : 0
+    : 0;
 
   // Boost score for tasks created longer ago (prevents procrastination)
   const daysSinceCreated = differenceInDays(new Date(), task.createdAt);
   const ageBonus = Math.min(daysSinceCreated * 2, 20);
 
   // Calculate final score
-  const finalScore = baseScore + overdueBonus + dueSoonBonus + ageBonus;
+  const finalScore =
+    baseScore + overdueBonus + dueSoonBonus + dueTodayBonus + ageBonus;
 
   return {
     taskId: task.id,
@@ -72,21 +82,23 @@ function getPriorityLevel(score: number): number {
 // Sort tasks by score (highest first), then by due date (earliest first)
 export function prioritizeTasks(tasks: Task[]): Task[] {
   const incompleteTasks = tasks.filter((task) => !task.completed);
-  const taskScores = incompleteTasks.map(calculateTaskScore);
 
-  // Sort by score (highest first), then by due date (earliest first)
-  taskScores.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
+  const todayTasks = incompleteTasks.filter((t) => isToday(t.dueDate));
+  const otherTasks = incompleteTasks.filter((t) => !isToday(t.dueDate));
 
-    const taskA = incompleteTasks.find((t) => t.id === a.taskId)!;
-    const taskB = incompleteTasks.find((t) => t.id === b.taskId)!;
+  const sortByScoreThenDate = (taskList: Task[]): Task[] =>
+    taskList
+      .map((task) => ({ task, score: calculateTaskScore(task).score }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.task.dueDate.getTime() - b.task.dueDate.getTime();
+      })
+      .map(({ task }) => task);
 
-    return taskA.dueDate.getTime() - taskB.dueDate.getTime();
-  });
+  const sortedToday = sortByScoreThenDate(todayTasks);
+  const sortedOther = sortByScoreThenDate(otherTasks);
 
-  return taskScores.map(
-    (score) => incompleteTasks.find((task) => task.id === score.taskId)!,
-  );
+  return [...sortedToday, ...sortedOther];
 }
 
 // Select up to 4 top-priority tasks for "Today's Focus" (used for sticky focus set)
@@ -155,43 +167,25 @@ function shouldRecurringTaskAppearOnDate(
     return true; // Non-recurring tasks follow normal scheduling
   }
 
-  // If the task's dueDate is the same as the date we're checking, it should appear
+  // Recurring tasks should only appear on the specific day they are scheduled for.
+  // If the task's dueDate matches the date being evaluated, show it (unless there's
+  // already a completed task with the same name on that day).
   if (isSameNormalizedDay(task.dueDate, date)) {
-    return true;
+    const dateKey = getDateKey(date);
+    const hasCompletedTaskOnSameDay = allTasks.some(
+      (otherTask) =>
+        otherTask.name === task.name &&
+        otherTask.completed &&
+        (getDateKey(otherTask.dueDate) === dateKey ||
+          getDateKey(otherTask.startDate) === dateKey),
+    );
+
+    return !hasCompletedTaskOnSameDay;
   }
 
-  // Check if there's already a completed task with the same name on this date
-  // This prevents new recurring tasks from appearing on the same day after completion
-  const dateKey = getDateKey(date);
-  const hasCompletedTaskOnSameDay = allTasks.some(
-    (otherTask) =>
-      otherTask.name === task.name &&
-      otherTask.completed &&
-      (getDateKey(otherTask.dueDate) === dateKey ||
-        getDateKey(otherTask.startDate) === dateKey),
-  );
-
-  if (hasCompletedTaskOnSameDay) {
-    return false;
-  }
-
-  // For recurring tasks, check if the date matches the recurrence pattern
-  switch (task.recurringInterval) {
-    case 'daily':
-      return true; // Daily tasks appear every day
-    case 'weekly':
-      if (task.recurringDays && task.recurringDays.length > 0) {
-        const dayOfWeek = getDay(date); // 0-6, where 0 is Sunday
-        return task.recurringDays.includes(dayOfWeek);
-      }
-      // If no specific days are set, check if it's the same day of week as the original due date
-      return getDay(date) === getDay(task.dueDate);
-    case 'monthly':
-      // Check if it's the same day of the month
-      return date.getDate() === task.dueDate.getDate();
-    default:
-      return false;
-  }
+  // If the task's due date is before or after the date being checked,
+  // it should not roll over or appear on other days.
+  return false;
 }
 
 export function assignStartDates(

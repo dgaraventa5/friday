@@ -381,12 +381,12 @@ function AppContent() {
 
       {/* Task input modal */}
       {isTaskInputExpanded && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
           <div
             ref={modalRef}
             className="bg-white rounded-xl w-full max-w-lg mx-4 p-3 sm:p-4 animate-slide-up overflow-hidden"
             style={{
-              maxHeight: '90vh',
+              maxHeight: 'calc(100vh - 4rem)',
               height: 'auto',
               marginBottom: '0',
             }}
@@ -403,7 +403,7 @@ function AppContent() {
 
       {/* Edit task modal */}
       {editingTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
           <div
             ref={modalRef}
             className="bg-white rounded-xl w-full max-w-lg mx-4 p-3 sm:p-4 animate-slide-up overflow-hidden"
@@ -435,7 +435,7 @@ function AppContent() {
 
       {/* Settings modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
           <div
             className="bg-white rounded-xl w-full max-w-lg p-4 animate-fade-in overflow-hidden"
             style={{
