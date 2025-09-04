@@ -12,7 +12,7 @@ export function LoadingOverlay({
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-60">
       <div className="text-center">
         <LoadingSpinner size="lg" className="mb-4" />
         <p className="text-gray-600 font-medium">{message}</p>
