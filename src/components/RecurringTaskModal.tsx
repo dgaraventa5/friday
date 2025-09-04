@@ -18,7 +18,7 @@ export function RecurringTaskModal({
   onClose,
 }: RecurringTaskModalProps) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 animate-fade-in">
       <div
         className="bg-white rounded-lg shadow-sm max-w-[260px] w-full p-2 animate-slide-up overflow-hidden mx-2"
         style={{
