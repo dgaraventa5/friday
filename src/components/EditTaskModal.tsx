@@ -68,8 +68,11 @@ export function EditTaskModal({
 
   return (
     <div className="bg-[#f7f7f7] rounded-lg border border-neutral-50 shadow-card animate-slide-up modal-form">
-      <form onSubmit={handleSubmit} className="w-full">
-        <div className="flex items-center justify-between p-3 border-b border-neutral-100">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full flex flex-col max-h-[calc(100vh-4rem)]"
+      >
+        <div className="flex items-center justify-between p-2 sm:p-3 border-b border-neutral-100">
           <h3 className="text-lg sm:text-xl font-bold text-neutral-900">
             Edit Task
           </h3>
@@ -84,8 +87,8 @@ export function EditTaskModal({
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
         </div>
-        
-        <div className="p-3 space-y-4">
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-4">
         {/* Task Name Field */}
         <FormField
           label="Task Name"
@@ -97,7 +100,7 @@ export function EditTaskModal({
           required
           error={errors.find((e) => e.field === 'name')?.message}
           placeholder="What needs to be done?"
-          className="text-base py-2 px-3 h-10 sm:h-12"
+          className="text-base py-2 px-3 h-9 sm:h-11"
         />
 
         {/* Category Field */}
@@ -116,11 +119,11 @@ export function EditTaskModal({
           }
           required
           error={errors.find((e) => e.field === 'category')?.message}
-          className="text-base py-2 px-3 h-10 sm:h-12"
+          className="text-base py-2 px-3 h-9 sm:h-11"
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          {/* Due Date Field */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {/* Due Date Field */}
           <FormField
             label="Due Date"
             type="date"
@@ -130,7 +133,7 @@ export function EditTaskModal({
             }
             required
             error={errors.find((e) => e.field === 'dueDate')?.message}
-            className="text-base py-2 px-3 h-10 sm:h-12"
+            className="text-base py-2 px-3 h-9 sm:h-11"
           />
 
           {/* Estimated Hours Field */}
@@ -146,7 +149,7 @@ export function EditTaskModal({
             step="0.25"
             required
             error={errors.find((e) => e.field === 'estimatedHours')?.message}
-            className="text-base py-2 px-3 h-10 sm:h-12"
+            className="text-base py-2 px-3 h-9 sm:h-11"
           />
         </div>
 
@@ -164,7 +167,7 @@ export function EditTaskModal({
             }
             required
             error={errors.find((e) => e.field === 'importance')?.message}
-            className="text-base py-2 px-3 h-10 sm:h-12"
+            className="text-base py-2 px-3 h-9 sm:h-11"
           />
 
           {/* Urgency Field */}
@@ -180,7 +183,7 @@ export function EditTaskModal({
             }
             required
             error={errors.find((e) => e.field === 'urgency')?.message}
-            className="text-base py-2 px-3 h-10 sm:h-12"
+            className="text-base py-2 px-3 h-9 sm:h-11"
           />
         </div>
 
@@ -217,7 +220,7 @@ export function EditTaskModal({
               error={
                 errors.find((e) => e.field === 'recurringInterval')?.message
               }
-              className="text-base py-2 px-3 h-10 sm:h-12"
+              className="text-base py-2 px-3 h-9 sm:h-11"
             />
 
             {/* Weekly Recurring Days */}
@@ -317,9 +320,10 @@ export function EditTaskModal({
           </div>
         )}
 
-        {/* Action Buttons - Full width on mobile */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-0 mt-4">
-          {/* Delete Button */}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-3 border-t border-neutral-100 bg-[#f7f7f7] flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-0">
           {onDelete && (
             <Button
               type="button"
@@ -331,8 +335,6 @@ export function EditTaskModal({
               Delete
             </Button>
           )}
-
-          {/* Update Button */}
           <Button
             type="submit"
             disabled={isSubmitting}
@@ -341,7 +343,6 @@ export function EditTaskModal({
           >
             {isSubmitting ? 'Updating...' : 'Update Task'}
           </Button>
-        </div>
         </div>
       </form>
     </div>
