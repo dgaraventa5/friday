@@ -19,7 +19,7 @@ export function BottomNav({ onToday, onAdd, onSchedule, currentPage = 'today' }:
     >
       {/* Today */}
       <button
-        className={`flex flex-col items-center justify-center ${currentPage === 'today' ? 'text-primary-500' : 'text-neutral-600'} hover:text-primary-600 focus:outline-none`}
+        className={`flex flex-col items-center justify-center transition-transform duration-200 ${currentPage === 'today' ? 'text-primary-500' : 'text-neutral-600'} hover:text-primary-600 hover:scale-110 active:scale-95 focus:outline-none`}
         onClick={onToday}
         aria-label="Go to Today"
       >
@@ -28,7 +28,7 @@ export function BottomNav({ onToday, onAdd, onSchedule, currentPage = 'today' }:
       </button>
       {/* Add (FAB style) */}
       <button
-        className="relative -mt-6 bg-primary-500 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-card hover:bg-primary-600 focus:outline-none border-4 border-white"
+        className="relative -mt-6 bg-primary-500 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-card hover:bg-primary-600 focus:outline-none border-4 border-white transition-transform duration-200 hover:scale-110 active:scale-95 animate-bounce-gentle"
         onClick={onAdd}
         aria-label="Add Task"
       >
@@ -36,7 +36,7 @@ export function BottomNav({ onToday, onAdd, onSchedule, currentPage = 'today' }:
       </button>
       {/* Schedule */}
       <button
-        className={`flex flex-col items-center justify-center ${currentPage === 'schedule' ? 'text-primary-500' : 'text-neutral-600'} hover:text-primary-600 focus:outline-none`}
+        className={`flex flex-col items-center justify-center transition-transform duration-200 ${currentPage === 'schedule' ? 'text-primary-500' : 'text-neutral-600'} hover:text-primary-600 hover:scale-110 active:scale-95 focus:outline-none`}
         onClick={onSchedule}
         aria-label="Go to Schedule"
       >
