@@ -32,6 +32,7 @@ import {
 import { processRecurringTasks } from '../utils/recurringTaskService';
 import { useAuth } from './AuthContext';
 import { normalizeDate } from '../utils/dateUtils';
+import { DEFAULT_CATEGORY_LIMITS } from '../utils/taskPrioritization';
 
 // Define the shape of our global state
 interface AppState {
@@ -76,6 +77,7 @@ const initialState: AppState = {
     categories: [],
     theme: 'light',
     notifications: true,
+    categoryLimits: DEFAULT_CATEGORY_LIMITS,
   },
   ui: {
     currentPage: 'today',
@@ -323,7 +325,14 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
           }
 
           if (preferences) {
-            dispatch({ type: 'UPDATE_PREFERENCES', payload: preferences });
+            const mergedPrefs = {
+              ...preferences,
+              categoryLimits: {
+                ...DEFAULT_CATEGORY_LIMITS,
+                ...(preferences.categoryLimits || {}),
+              },
+            };
+            dispatch({ type: 'UPDATE_PREFERENCES', payload: mergedPrefs });
           }
 
           if (onboardingComplete && !testMode) {
@@ -386,9 +395,16 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
               dispatch({ type: 'SET_CATEGORIES', payload: loadedCategories });
             }
             if (loadedPreferences) {
+              const mergedPrefs = {
+                ...loadedPreferences,
+                categoryLimits: {
+                  ...DEFAULT_CATEGORY_LIMITS,
+                  ...(loadedPreferences.categoryLimits || {}),
+                },
+              };
               dispatch({
                 type: 'UPDATE_PREFERENCES',
-                payload: loadedPreferences,
+                payload: mergedPrefs,
               });
             }
             if (onboardingComplete && !testMode) {

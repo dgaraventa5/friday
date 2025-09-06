@@ -1,25 +1,25 @@
 // Header.tsx
 // App header: shows app name, date, progress circle for Today's Focus, and settings button.
 
-import { User } from 'lucide-react';
+import { User, Settings } from 'lucide-react';
 import { ProgressCircle } from './ProgressCircle';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserProfile } from './UserProfile';
+import { CategoryLimitMenu } from './CategoryLimitMenu';
 
 interface HeaderProps {
-  onOpenSettings: () => void;
   todayTaskCount: number;
   totalTaskCount: number;
   todayTasksCompleted: number;
 }
 
 export function Header({
-  onOpenSettings,
   todayTaskCount,
   todayTasksCompleted,
 }: HeaderProps) {
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [imageError, setImageError] = useState(false);
   const { authState } = useAuth();
   const { user } = authState;
@@ -93,6 +93,21 @@ export function Header({
               />
             </div>
 
+            {/* Settings button */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors duration-200"
+                title="Settings"
+                style={{ width: iconSize, height: iconSize }}
+              >
+                <Settings className="w-6 h-6" />
+              </button>
+              {showSettings && (
+                <CategoryLimitMenu onClose={() => setShowSettings(false)} />
+              )}
+            </div>
+
             {/* User profile button */}
             <div className="relative">
               <button
@@ -130,7 +145,7 @@ export function Header({
               {/* User profile dropdown */}
               {showUserProfile && (
                 <div className="absolute right-0 mt-2 z-10 w-64">
-                  <UserProfile onOpenSettings={onOpenSettings} />
+                  <UserProfile />
                 </div>
               )}
             </div>

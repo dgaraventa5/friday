@@ -1,5 +1,6 @@
 import { Task, Category, UserPreferences } from '../types/task';
 import { normalizeDate, getDateKey } from './dateUtils';
+import { DEFAULT_CATEGORY_LIMITS } from './taskPrioritization';
 
 const STORAGE_KEYS = {
   TASKS: 'friday_tasks',
@@ -144,5 +145,6 @@ export function getDefaultPreferences(): UserPreferences {
     categories: getDefaultCategories(),
     theme: 'light',
     notifications: true,
+    categoryLimits: DEFAULT_CATEGORY_LIMITS,
   };
 }

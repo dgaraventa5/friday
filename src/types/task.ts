@@ -33,6 +33,7 @@ export interface UserPreferences {
   categories: Category[];
   theme: 'light' | 'dark';
   notifications: boolean;
+  categoryLimits?: Record<string, { max: number }>;
   defaultView?: string;
   notificationsEnabled?: boolean;
   emailNotifications?: boolean;
