@@ -18,7 +18,7 @@ export function PageLayout({
   allowScroll = false,
 }: PageLayoutProps) {
   return (
-    <div className={allowScroll ? 'schedule-page' : 'viewport-height'}>
+    <div className={`${allowScroll ? 'schedule-page' : 'viewport-height'} animate-fade-in`}>
       {title && (
         <h1 className="text-2xl font-bold text-neutral-900 mb-4">{title}</h1>
       )}
