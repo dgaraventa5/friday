@@ -22,9 +22,7 @@ import { RecurringTaskModal } from './components/RecurringTaskModal';
 import { handleRecurringTaskCompletion } from './utils/recurringTaskService';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DevTools } from './components/DevTools';
-import { Button } from './components/Button';
 import { getTodayKey, getDateKey } from './utils/dateUtils';
-import { X } from 'lucide-react';
 
 // Helper to get a string key for today (YYYY-MM-DD) - DEPRECATED, use getTodayKey from dateUtils
 // function getTodayKey() {
@@ -49,7 +47,6 @@ function AppContent() {
     const stored = localStorage.getItem('completed_focus_' + todayKey);
     return stored ? JSON.parse(stored) : [];
   });
-  const [showSettings, setShowSettings] = useState(false);
   const { authState } = useAuth();
 
   // Update completedFocusIds when a task is completed
@@ -106,7 +103,11 @@ function AppContent() {
   }, [dispatch, todayKey]); // todayKey changes when the date changes
 
   // Always use assigned tasks for rendering
-  const assignedTasks = assignStartDates(tasks, 4);
+  const assignedTasks = assignStartDates(
+    tasks,
+    4,
+    state.preferences.categoryLimits,
+  );
 
   // Get today's date as a string in YYYY-MM-DD format for comparison
   const todayDateString = getTodayKey();
@@ -315,11 +316,6 @@ function AppContent() {
     }
   }, [tasks, onboarding_complete, authState, dispatch]);
 
-  // Add a handler for opening settings
-  const handleOpenSettings = () => {
-    setShowSettings(true);
-  };
-
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Overlay for loading state */}
@@ -328,7 +324,6 @@ function AppContent() {
       {/* App header with progress circle */}
       <ErrorBoundary>
         <Header
-          onOpenSettings={handleOpenSettings}
           todayTaskCount={todayFocusTasks.length}
           totalTaskCount={tasks.length}
           todayTasksCompleted={
@@ -431,46 +426,6 @@ function AppContent() {
           nextTask={recurringModal.nextTask}
           onClose={() => setRecurringModal(null)}
         />
-      )}
-
-      {/* Settings modal */}
-        {showSettings && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-          <div
-            className="bg-white rounded-xl w-full max-w-lg p-4 animate-fade-in overflow-hidden"
-            style={{
-              maxHeight: 'calc(100vh - 48px)',
-              height: 'auto',
-            }}
-          >
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-xl font-bold">Settings</h2>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="p-2 text-neutral-600 hover:text-neutral-900 rounded-full"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 overflow-y-auto">
-              {/* Settings content will go here */}
-              <p className="text-neutral-600">
-                Settings options will be added here.
-              </p>
-            </div>
-
-            <div className="mt-4">
-              <Button
-                onClick={() => setShowSettings(false)}
-                variant="primary"
-                className="w-full py-2 text-sm"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Developer Tools */}

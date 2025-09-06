@@ -145,8 +145,8 @@ export function checkCategoryLimits(
   return { allowed: true };
 }
 
-// Category daily hour limits
-const CATEGORY_LIMITS: Record<string, { max: number }> = {
+// Default category daily hour limits
+export const DEFAULT_CATEGORY_LIMITS: Record<string, { max: number }> = {
   Work: { max: 10 },
   Home: { max: 3 },
   Health: { max: 3 },
@@ -191,6 +191,7 @@ function shouldRecurringTaskAppearOnDate(
 export function assignStartDates(
   tasks: Task[],
   maxPerDay: number = 4,
+  categoryLimits: Record<string, { max: number }> = DEFAULT_CATEGORY_LIMITS,
   baseDate?: Date,
 ): Task[] {
   // First, normalize all dates to startOfDay for consistency
@@ -342,7 +343,7 @@ export function assignStartDates(
         if (totalTasks >= remainingCapacity) break;
         const task = unassigned[i];
         const cat = task.category?.name || 'Other';
-        const cap = CATEGORY_LIMITS[cat] || { max: Infinity };
+        const cap = categoryLimits[cat] || { max: Infinity };
         const used = categoryHours[cat] || 0;
         // Skip Work tasks on weekends
         if (isWknd && cat === 'Work') {

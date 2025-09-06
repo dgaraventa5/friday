@@ -11,11 +11,15 @@ export function DevTools() {
   const { state, testMode, toggleTestMode } = useApp();
   const { authState } = useAuth();
   const { user } = authState;
-  const { tasks } = state;
+  const { tasks, preferences } = state;
   const [showDebug, setShowDebug] = useState(false);
 
   // Get assigned tasks
-  const assignedTasks = assignStartDates(tasks, 4);
+  const assignedTasks = assignStartDates(
+    tasks,
+    4,
+    preferences.categoryLimits,
+  );
 
   // Get today's and tomorrow's date keys
   const todayKey = getTodayKey();

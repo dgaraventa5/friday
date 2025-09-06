@@ -1,4 +1,4 @@
-import { assignStartDates } from './taskPrioritization';
+import { assignStartDates, DEFAULT_CATEGORY_LIMITS } from './taskPrioritization';
 import { Task } from '../types/task';
 import { normalizeDate } from './dateUtils';
 
@@ -38,6 +38,7 @@ describe('assignStartDates with recurring tasks', () => {
     const result = assignStartDates(
       [recurringTaskSep3, recurringTaskSep4],
       4,
+      DEFAULT_CATEGORY_LIMITS,
       baseDate,
     );
 
