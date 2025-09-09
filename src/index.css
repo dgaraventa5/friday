@@ -15,19 +15,19 @@
 
 /* Add these new utility classes */
 .viewport-height {
-  height: calc(100vh - var(--header-height) - var(--bottom-nav-height));
-  max-height: calc(100vh - var(--header-height) - var(--bottom-nav-height));
+  height: calc(100dvh - var(--header-height) - var(--bottom-nav-height));
+  max-height: calc(100dvh - var(--header-height) - var(--bottom-nav-height));
   overflow-y: hidden;
 }
 
 .schedule-page {
-  height: calc(100vh - var(--header-height) - var(--bottom-nav-height));
-  max-height: calc(100vh - var(--header-height) - var(--bottom-nav-height));
+  height: calc(100dvh - var(--header-height) - var(--bottom-nav-height));
+  max-height: calc(100dvh - var(--header-height) - var(--bottom-nav-height));
   overflow-y: auto;
 }
 
 :root {
-  --header-height: 72px;
+  --header-height: 60px;
   --bottom-nav-height: 64px;
 }
 

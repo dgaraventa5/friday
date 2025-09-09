@@ -340,28 +340,26 @@ function AppContent() {
             <ErrorBoundary>
               {!onboarding_complete && tasks.length === 0 && <WelcomeMessage />}
             </ErrorBoundary>
-            <div className="mt-4 space-y-4 h-full">
-              {/* Main task list (today's focus or full schedule) */}
-              <ErrorBoundary>
-                <TaskErrorBoundary>
-                  {ui.isLoading ? (
-                    <LoadingState message="Loading tasks..." />
-                  ) : ui.currentPage === 'schedule' ? (
-                    <SchedulePage
-                      tasks={assignedTasks}
-                      onToggleComplete={handleToggleComplete}
-                      onEdit={handleEditTask}
-                    />
-                  ) : (
-                    <TaskList
-                      tasks={todayFocusTasks}
-                      onToggleComplete={handleToggleComplete}
-                      onEdit={handleEditTask}
-                    />
-                  )}
-                </TaskErrorBoundary>
-              </ErrorBoundary>
-            </div>
+            {/* Main task list (today's focus or full schedule) */}
+            <ErrorBoundary>
+              <TaskErrorBoundary>
+                {ui.isLoading ? (
+                  <LoadingState message="Loading tasks..." />
+                ) : ui.currentPage === 'schedule' ? (
+                  <SchedulePage
+                    tasks={assignedTasks}
+                    onToggleComplete={handleToggleComplete}
+                    onEdit={handleEditTask}
+                  />
+                ) : (
+                  <TaskList
+                    tasks={todayFocusTasks}
+                    onToggleComplete={handleToggleComplete}
+                    onEdit={handleEditTask}
+                  />
+                )}
+              </TaskErrorBoundary>
+            </ErrorBoundary>
           </div>
         </div>
       </main>
