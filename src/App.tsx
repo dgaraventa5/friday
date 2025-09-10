@@ -18,7 +18,6 @@ import { assignStartDates } from './utils/taskPrioritization';
 import { BottomNav } from './components/BottomNav';
 import { SchedulePage } from './components/SchedulePage';
 import { EditTaskModal } from './components/EditTaskModal';
-import { RecurringTaskModal } from './components/RecurringTaskModal';
 import { handleRecurringTaskCompletion } from './utils/recurringTaskService';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DevTools } from './components/DevTools';
@@ -37,10 +36,6 @@ function AppContent() {
   const { tasks, categories, ui, onboarding_complete } = state;
   const [isTaskInputExpanded, setIsTaskInputExpanded] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [recurringModal, setRecurringModal] = useState<{
-    completedTask: Task;
-    nextTask: Task;
-  } | null>(null);
   const todayKey = getTodayKey();
   // Sticky set of completed focus task IDs for today
   const [completedFocusIds, setCompletedFocusIds] = useState<string[]>(() => {
@@ -161,13 +156,7 @@ function AppContent() {
       // Generate next occurrence when marking a recurring task as complete
       const nextTask = handleRecurringTaskCompletion(task);
       if (nextTask) {
-        // Show the modal with information about the recurring task
-        setRecurringModal({ completedTask: task, nextTask });
-
-        // Add the new recurring task
-        setTimeout(() => {
-          dispatch({ type: 'ADD_TASK', payload: nextTask });
-        }, 100);
+        dispatch({ type: 'ADD_TASK', payload: nextTask });
       }
     }
 
@@ -415,15 +404,6 @@ function AppContent() {
             />
           </div>
         </div>
-      )}
-
-      {/* Recurring task modal */}
-      {recurringModal && (
-        <RecurringTaskModal
-          completedTask={recurringModal.completedTask}
-          nextTask={recurringModal.nextTask}
-          onClose={() => setRecurringModal(null)}
-        />
       )}
 
       {/* Developer Tools */}
