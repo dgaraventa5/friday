@@ -205,6 +205,7 @@ export function assignStartDates(
 
   // Get completed tasks by day to count them against the daily limit
   const completedTasksByDay = new Map<string, number>();
+  const completedCategoryHoursByDay = new Map<string, Record<string, number>>();
   normalizedTasks
     .filter((task) => task.completed)
     .forEach((task) => {
@@ -213,6 +214,12 @@ export function assignStartDates(
         dateKey,
         (completedTasksByDay.get(dateKey) || 0) + 1,
       );
+
+      const cat = task.category?.name || 'Other';
+      const hours = task.estimatedHours || 1;
+      const categoryMap = completedCategoryHoursByDay.get(dateKey) || {};
+      categoryMap[cat] = (categoryMap[cat] || 0) + hours;
+      completedCategoryHoursByDay.set(dateKey, categoryMap);
     });
 
   // Separate recurring and non-recurring tasks
@@ -328,7 +335,9 @@ export function assignStartDates(
     );
 
     const currentBucket: typeof scoredNonRecurring = [];
-    const categoryHours: Record<string, number> = {};
+    const categoryHours: Record<string, number> = {
+      ...(completedCategoryHoursByDay.get(dateKey) || {}),
+    };
     let totalTasks = 0;
     let scheduledAny = true;
 
