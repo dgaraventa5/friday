@@ -50,3 +50,81 @@ describe('assignStartDates with recurring tasks', () => {
     expect(tasksOnSep4[0].dueDate.getTime()).toBe(baseDate.getTime());
   });
 });
+
+describe('assignStartDates category limits', () => {
+  it('counts completed task hours toward daily category limits', () => {
+    const baseDate = normalizeDate(new Date('2025-09-04'));
+    const homeCategory = {
+      id: 'home',
+      name: 'Home',
+      color: 'green',
+      dailyLimit: 4,
+      icon: '🏠',
+    };
+
+    const completedHomeTask: Task = {
+      id: '1',
+      name: 'Completed home task',
+      category: homeCategory,
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: baseDate,
+      startDate: baseDate,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+      completed: true,
+      estimatedHours: 3,
+    };
+
+    const pendingHomeTask: Task = {
+      id: '2',
+      name: 'Pending home task',
+      category: homeCategory,
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: baseDate,
+      startDate: baseDate,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+      completed: false,
+      estimatedHours: 1,
+    };
+
+    const workCategory = {
+      id: 'work',
+      name: 'Work',
+      color: 'blue',
+      dailyLimit: 4,
+      icon: '💼',
+    };
+
+    const workTask: Task = {
+      id: '3',
+      name: 'Work task',
+      category: workCategory,
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: baseDate,
+      startDate: baseDate,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+      completed: false,
+      estimatedHours: 1,
+    };
+
+    const result = assignStartDates(
+      [completedHomeTask, pendingHomeTask, workTask],
+      4,
+      DEFAULT_CATEGORY_LIMITS,
+      baseDate,
+    );
+
+    const nextDay = new Date(baseDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const scheduledPendingTask = result.find((t) => t.id === '2')!;
+    expect(scheduledPendingTask.startDate.getTime()).toBe(
+      nextDay.getTime(),
+    );
+  });
+});
