@@ -13,6 +13,7 @@ interface TaskInputProps {
   onAddTask: (task: Task) => void;
   onCancel?: () => void;
   isExpanded?: boolean;
+  submitLabel?: string;
 }
 
 export function TaskInput({
@@ -20,6 +21,7 @@ export function TaskInput({
   onAddTask,
   onCancel,
   isExpanded = false,
+  submitLabel = 'Add Task',
 }: TaskInputProps) {
   // Local state for task fields
   const [task, setTask] = useState<Partial<Task>>({
@@ -466,7 +468,7 @@ export function TaskInput({
             variant="primary"
             className="w-full !px-3 !py-1.5 text-sm sm:!px-4 sm:!py-2"
           >
-            {isSubmitting ? 'Adding...' : 'Add Task'}
+            {isSubmitting ? 'Adding...' : submitLabel}
           </Button>
         </div>
       </form>
