@@ -2,12 +2,14 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { OnboardingFlow } from './Onboarding';
+import React, { ReactNode } from 'react';
 import '@testing-library/jest-dom';
 
 jest.mock('../utils/analytics', () => ({ trackEvent: jest.fn() }));
 
 jest.mock('../context/AuthContext', () => ({
-  useAuth: () => ({ signIn: jest.fn().mockResolvedValue(null), authState: { user: null, loading: false, error: null } }),
+  AuthProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  useAuth: () => ({}),
 }));
 
 jest.mock('../context/AppContext', () => ({
@@ -29,7 +31,6 @@ test('user can complete onboarding flow', async () => {
   fireEvent.click(screen.getByRole('button', { name: /continue/i }));
   fireEvent.click(screen.getByRole('button', { name: /let's do it/i }));
 
-  fireEvent.click(screen.getByRole('button', { name: /sign in with google/i }));
   await waitFor(() => screen.getByRole('button', { name: /save task/i }));
 
   fireEvent.change(screen.getByLabelText(/task name/i), {
