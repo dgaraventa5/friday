@@ -35,7 +35,8 @@ export function Header({
   }, [user]);
 
   const iconSize = 40;
-  const sunIconSize = 36;
+  // Height of the logo (sun icon + text)
+  const logoHeight = 36;
 
   return (
     <header
@@ -53,8 +54,8 @@ export function Header({
           {/* App logo */}
           <div className="flex items-center">
             <svg
-              width={sunIconSize}
-              height={sunIconSize}
+              width={logoHeight}
+              height={logoHeight}
               viewBox="0 0 200 200"
               xmlns="http://www.w3.org/2000/svg"
             >
@@ -80,6 +81,9 @@ export function Header({
                 fill="#FFB800"
               />
             </svg>
+            <span className="ml-2 text-[#FFB800] font-semibold text-2xl leading-none">
+              friday
+            </span>
           </div>
 
           {/* Progress circle and user profile */}
