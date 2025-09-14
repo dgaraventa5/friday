@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { TaskInput } from '../components/TaskInput';
-import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { Task } from '../types/task';
 import { trackEvent } from '../utils/analytics';
@@ -34,16 +33,10 @@ const steps = [
       "Once you start recording tasks, the 'Today' view will show you the top tasks for you to complete for the day.\n\nCognitive research shows that humans only have so much mental energy in one day. By focusing on a few highest-priority tasks each day, you'll begin to feel your stress decrease and effectiveness improve.\n\nWatch yourself accomplish your goals more quickly, with your efforts compounding day over day.",
     cta: "Let's do it",
   },
-  {
-    title: 'sign in with google',
-    body: 'To save tasks and sync across devices, connect your Google account.',
-    cta: 'Sign in with Google',
-  },
 ];
 
 export function OnboardingFlow() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
   const { state, dispatch } = useApp();
   const { categories } = state;
   const [step, setStep] = useState(1);
@@ -59,21 +52,16 @@ export function OnboardingFlow() {
     trackEvent('onboarding.step_view', { step });
   }, [step]);
 
-  const handlePrimary = async () => {
+  const handlePrimary = () => {
     trackEvent('onboarding.button_click', { step });
-    if (step === 5) {
-      await signIn();
-      setStep(6);
-    } else {
-      setStep(step + 1);
-    }
+    setStep(step + 1);
   };
 
   const handleAddTask = (task: Task) => {
-    trackEvent('onboarding.button_click', { step: 6 });
+    trackEvent('onboarding.button_click', { step: 5 });
     dispatch({ type: 'ADD_TASK', payload: task });
     trackEvent('onboarding.task_created');
-    setStep(7);
+    setStep(6);
   };
 
   const handleFinish = () => {
@@ -86,7 +74,7 @@ export function OnboardingFlow() {
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4">
-      {step <= 5 && (
+      {step <= 4 && (
         <div className="max-w-md w-full text-center space-y-6">
           <h1 className="text-2xl font-bold" aria-live="polite">{steps[step - 1].title}</h1>
           <p className="text-neutral-700 whitespace-pre-line">{steps[step - 1].body}</p>
@@ -95,7 +83,7 @@ export function OnboardingFlow() {
           </Button>
         </div>
       )}
-      {step === 6 && (
+      {step === 5 && (
         <div className="w-full max-w-lg">
           {categories.length === 0 ? (
             <p className="text-center">Loading...</p>
@@ -109,7 +97,7 @@ export function OnboardingFlow() {
           )}
         </div>
       )}
-      {step === 7 && (
+      {step === 6 && (
         <div className="max-w-md w-full text-center space-y-6">
           <h1 className="text-2xl font-bold" aria-live="polite">🎉 great start!</h1>
           <p className="text-neutral-700">
