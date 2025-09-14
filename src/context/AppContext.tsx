@@ -12,7 +12,8 @@ import {
   useCallback,
   memo,
 } from 'react';
-import { Task, Category, UserPreferences } from '../types/task';
+import { Task, Category } from '../types/task';
+import { UserPreferences } from '../types/user';
 import {
   loadTasks,
   loadCategories,
