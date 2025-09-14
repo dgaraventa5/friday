@@ -12,4 +12,5 @@ export default {
   transformIgnorePatterns: [
     '/node_modules/(?!.*\\.mjs$)'
   ],
-}; 
+  setupFiles: ['./jest.setup.ts'],
+};
