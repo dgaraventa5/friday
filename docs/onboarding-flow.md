@@ -45,24 +45,17 @@ Watch yourself accomplish your goals more quickly, with your efforts compounding
 - **Primary button:** **Let's do it** → goes to Step 5
 - **Secondary button:** none
 
-## Step 5: Connect your Google account
-- **Title:** sign in with google
-- **Body:** To save tasks and sync across devices, connect your Google account.
-
-- **Primary button:** **Sign in with Google** → triggers Google sign-in
-- **Secondary button:** none
-
 ---
 
-## Step 6: Create Your First Task
+## Step 5: Create Your First Task
 - **Title:** create your first task
 - **Body:** Let’s start simple. Add one task you’d like to get done today.
 - **Action:** Show the existing **Task Form** component (same fields as on the main app: name, category, importance, urgency, due date, estimated time).
-- **Primary button:** **Save Task** → adds task to “MasterTasks” sheet and goes to Step 7
+- **Primary button:** **Save Task** → adds task to “MasterTasks” sheet and goes to Step 6
 
 ---
 
-## Step 7: Success
+## Step 6: Success
 - **Title:** 🎉 great start!
 - **Body:** Your first task is ready. Check Today’s list to see it. Add more tasks to unlock your productivity. 
 - **Primary button:** **Go to Today** → redirect to Today view (the same screen that loads in `index.html`)
