@@ -1,4 +1,5 @@
-import { Task, Category, UserPreferences } from '../types/task';
+import { Task, Category } from '../types/task';
+import { UserPreferences } from '../types/user';
 import { normalizeDate, getDateKey } from './dateUtils';
 import logger from './logger';
 import { DEFAULT_CATEGORY_LIMITS } from './taskPrioritization';
