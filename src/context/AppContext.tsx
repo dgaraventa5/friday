@@ -33,6 +33,7 @@ import { processRecurringTasks } from '../utils/recurringTaskService';
 import { useAuth } from './AuthContext';
 import { normalizeDate } from '../utils/dateUtils';
 import { DEFAULT_CATEGORY_LIMITS } from '../utils/taskPrioritization';
+import logger from '../utils/logger';
 
 // Define the shape of our global state
 interface AppState {
@@ -135,7 +136,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       const toggledTask = updatedTasks.find(
         (task) => task.id === action.payload,
       );
-      console.log(
+      logger.log(
         `[AppContext] Task ${toggledTask?.name} (${action.payload}) toggled to ${toggledTask?.completed ? 'completed' : 'incomplete'}`,
       );
 
@@ -183,7 +184,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ui: { ...state.ui, error: action.payload },
       };
     case 'SET_ONBOARDING_COMPLETE':
-      console.log(
+      logger.log(
         `[AppContext] Setting onboarding_complete to: ${action.payload}`,
       );
       return { ...state, onboarding_complete: action.payload };
@@ -206,7 +207,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
           : undefined,
       }));
 
-      console.log('Normalized all dates in tasks');
+      logger.log('Normalized all dates in tasks');
       return { ...state, tasks: normalizedTasks };
     }
     default:
@@ -228,9 +229,9 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
     setTestMode((prev) => !prev);
     if (!testMode) {
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: false });
-      console.log('Test mode activated: Onboarding reset');
+      logger.log('Test mode activated: Onboarding reset');
     } else {
-      console.log('Test mode deactivated');
+      logger.log('Test mode deactivated');
     }
   }, [testMode, dispatch]);
 
@@ -250,7 +251,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   // Load data from Firestore on mount, with localStorage fallback
   useEffect(() => {
     if (userId) {
-      console.log('[AppContext] Loading data for user:', userId);
+      logger.log('[AppContext] Loading data for user:', userId);
       dispatch({ type: 'SET_LOADING', payload: true });
       setIsDataLoaded(false);
 
@@ -271,7 +272,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
         loadOnboardingStatusFromFirestore(userId),
       ])
         .then(([tasks, categories, preferences, onboardingComplete]) => {
-          console.log(
+          logger.log(
             `[AppContext] Loaded ${tasks.length} tasks, ${categories.length} categories from Firestore`,
           );
 
@@ -308,7 +309,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
               },
             ];
             dispatch({ type: 'SET_CATEGORIES', payload: defaultCategories });
-            console.log(
+            logger.log(
               '[AppContext] Added default categories:',
               defaultCategories.length,
             );
@@ -347,10 +348,10 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
             const localCategories = loadCategories(userPrefix);
 
             if (localTasks.length > 0 || localCategories.length > 0) {
-              console.log('[AppContext] Migrating local data to Firestore');
+              logger.log('[AppContext] Migrating local data to Firestore');
               migrateLocalStorageToFirestore(userId)
                 .then(() => {
-                  console.log('[AppContext] Migration complete');
+                  logger.log('[AppContext] Migration complete');
                 })
                 .catch((error) => {
                   console.error('[AppContext] Migration failed:', error);
@@ -384,7 +385,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
               localStorage.getItem(`${userPrefix}onboarding_complete`) ===
               'true';
 
-            console.log(
+            logger.log(
               `[AppContext] Loaded ${loadedTasks.length} tasks, ${loadedCategories.length} categories from localStorage`,
             );
 
@@ -431,7 +432,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   // Save tasks to Firestore when they change
   useEffect(() => {
     if (state.tasks.length > 0 && userId && isDataLoaded) {
-      console.log(`[AppContext] Saving ${state.tasks.length} tasks`);
+      logger.log(`[AppContext] Saving ${state.tasks.length} tasks`);
 
       // Save to Firestore with localStorage fallback
       saveTasksToFirestore(userId, state.tasks).catch((error) => {
@@ -444,7 +445,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   // Save categories to Firestore when they change
   useEffect(() => {
     if (state.categories.length > 0 && userId && isDataLoaded) {
-      console.log(`[AppContext] Saving ${state.categories.length} categories`);
+      logger.log(`[AppContext] Saving ${state.categories.length} categories`);
 
       // Save to Firestore with localStorage fallback
       saveCategoriesToFirestore(userId, state.categories).catch((error) => {
@@ -460,7 +461,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   // Save preferences to Firestore when they change
   useEffect(() => {
     if (state.preferences && userId && isDataLoaded) {
-      console.log('[AppContext] Saving preferences');
+      logger.log('[AppContext] Saving preferences');
 
       // Save to Firestore with localStorage fallback
       savePreferencesToFirestore(userId, state.preferences).catch((error) => {
@@ -476,7 +477,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   // Save onboarding_complete to Firestore when it changes
   useEffect(() => {
     if (userId && !testMode && isDataLoaded) {
-      console.log(
+      logger.log(
         `[AppContext] Saving onboarding status: ${state.onboarding_complete}`,
       );
 
