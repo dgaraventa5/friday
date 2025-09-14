@@ -1,5 +1,6 @@
 import { Task, Category, UserPreferences } from '../types/task';
 import { normalizeDate, getDateKey } from './dateUtils';
+import logger from './logger';
 import { DEFAULT_CATEGORY_LIMITS } from './taskPrioritization';
 
 const STORAGE_KEYS = {
@@ -42,7 +43,7 @@ export function loadTasks(prefix: string = ''): Task[] {
       );
     }
     // Debug log: print all loaded tasks' startDate values
-    console.log(
+    logger.log(
       'Loaded tasks with normalized startDate:',
       tasks.map((t: Task) => ({
         name: t.name,

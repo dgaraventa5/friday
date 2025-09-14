@@ -4,6 +4,7 @@
 import { Task, TaskScore, EisenhowerQuadrant } from '../types/task';
 import { isToday, differenceInDays, isPast } from 'date-fns';
 import { normalizeDate, getDateKey, isSameNormalizedDay } from './dateUtils';
+import logger from './logger';
 
 // Calculate a score for a task based on importance, urgency, due date, and age
 export function calculateTaskScore(task: Task): TaskScore {
@@ -323,14 +324,14 @@ export function assignStartDates(
 
     // Skip to next day if no capacity left after recurring tasks and completed tasks
     if (remainingCapacity <= 0) {
-      console.log(
+      logger.log(
         `Day ${dayOffset}: Skipping - ${recurringTasksCount} recurring tasks, ${completedTasksCount} completed tasks already at or exceeding max (${maxPerDay})`,
       );
       dayOffset++;
       continue;
     }
 
-    console.log(
+    logger.log(
       `Day ${dayOffset}: ${recurringTasksCount} recurring tasks, ${completedTasksCount} completed tasks, ${remainingCapacity} slots remaining (max: ${maxPerDay})`,
     );
 
@@ -373,7 +374,7 @@ export function assignStartDates(
       }
     }
 
-    console.log(
+    logger.log(
       `Day ${dayOffset} final: ${recurringTasksCount + currentBucket.length + completedTasksCount} total tasks assigned (including ${completedTasksCount} completed)`,
     );
 
@@ -429,13 +430,13 @@ export function assignStartDates(
     const completedCount = tasksForDay.filter((t) => t.completed).length;
 
     if (tasksForDay.length > maxPerDay) {
-      console.warn(
+      logger.warn(
         `Warning: ${dateKey} has ${tasksForDay.length} tasks (${incompleteCount} incomplete, ${completedCount} completed) exceeding max ${maxPerDay}`,
       );
     }
   });
 
-  console.log(
+  logger.log(
     'Task prioritization - Assigned tasks with normalized dates:',
     result.map((t) => ({
       name: t.name,

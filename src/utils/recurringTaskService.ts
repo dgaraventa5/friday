@@ -4,6 +4,7 @@
 import { Task } from '../types/task';
 import { getNextRecurringDate, normalizeDate, getDateKey } from './dateUtils';
 import { addDays, isBefore } from 'date-fns';
+import logger from './logger';
 
 // Check if a recurring task has reached its end
 export function hasReachedEndOfRecurrence(task: Task): boolean {
@@ -192,7 +193,7 @@ export function processRecurringTasks(tasks: Task[]): Task[] {
     }
   });
 
-  console.log(`Generated ${newTasks.length} future recurring task instances`);
+  logger.log(`Generated ${newTasks.length} future recurring task instances`);
   return [...tasks, ...newTasks];
 }
 
