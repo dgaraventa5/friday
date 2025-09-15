@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { TaskInput } from '../components/TaskInput';
 import { useApp } from '../context/AppContext';
-import { Task } from '../types/task';
+import { Task, AddTaskResult } from '../types/task';
+import { checkCategoryLimits } from '../utils/taskPrioritization';
 import { trackEvent } from '../utils/analytics';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { AuthProvider } from '../context/AuthContext';
@@ -57,11 +58,16 @@ export function OnboardingFlow() {
     setStep(step + 1);
   };
 
-  const handleAddTask = (task: Task) => {
+  const handleAddTask = (task: Task): AddTaskResult => {
     trackEvent('onboarding.button_click', { step: 5 });
+    const limitCheck = checkCategoryLimits(state.tasks, task);
+    if (!limitCheck.allowed) {
+      return { success: false, message: limitCheck.message };
+    }
     dispatch({ type: 'ADD_TASK', payload: task });
     trackEvent('onboarding.task_created');
     setStep(6);
+    return { success: true };
   };
 
   const handleFinish = () => {

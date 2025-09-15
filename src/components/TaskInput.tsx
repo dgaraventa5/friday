@@ -4,13 +4,13 @@
 import { useState, ChangeEvent } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from './Button';
-import { Task, Category } from '../types/task';
+import { Task, Category, AddTaskResult } from '../types/task';
 import { FormField } from './FormField';
 import { validateTask, ValidationError } from '../utils/validation';
 
 interface TaskInputProps {
   categories: Category[];
-  onAddTask: (task: Task) => void;
+  onAddTask: (task: Task) => AddTaskResult;
   onCancel?: () => void;
   isExpanded?: boolean;
   submitLabel?: string;
@@ -41,6 +41,8 @@ export function TaskInput({
   const [errors, setErrors] = useState<ValidationError[]>([]);
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Error from submitting
+  const [submitError, setSubmitError] = useState<string | null>(null);
   // Toggle for additional options section
   const [showRecurrence, setShowRecurrence] = useState(false);
 
@@ -86,7 +88,13 @@ export function TaskInput({
       startDate: new Date(), // Set startDate to current date instead of undefined
     };
 
-    onAddTask(newTask);
+    const result = onAddTask(newTask);
+    if (!result.success) {
+      setSubmitError(result.message || 'Unable to add task');
+      setIsSubmitting(false);
+      return;
+    }
+
     // Reset form state
     setTask({
       name: '',
@@ -101,6 +109,7 @@ export function TaskInput({
       recurringCurrentCount: 0,
     });
     setErrors([]);
+    setSubmitError(null);
     setIsSubmitting(false);
   };
 
@@ -118,6 +127,7 @@ export function TaskInput({
       recurringEndCount: 1,
       recurringCurrentCount: 0,
     });
+    setSubmitError(null);
     onCancel?.();
   };
 
@@ -158,6 +168,14 @@ export function TaskInput({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-4 sm:space-y-6">
+          {submitError && (
+            <div
+              role="alert"
+              className="p-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded"
+            >
+              {submitError}
+            </div>
+          )}
           {/* Basics */}
           <section className="space-y-3">
             <FormField

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Task, Category, UserPreferences } from '../types/task';
+import { Task, Category, UserPreferences, AddTaskResult } from '../types/task';
 import {
   saveTasks,
   loadTasks,
@@ -53,12 +53,11 @@ export function useTasks() {
 
   const addTask = (
     taskData: Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt'>,
-  ) => {
+  ): AddTaskResult => {
     // Check category limits
     const limitCheck = checkCategoryLimits(tasks, { ...taskData } as Task);
     if (!limitCheck.allowed) {
-      alert(limitCheck.message);
-      return false;
+      return { success: false, message: limitCheck.message };
     }
 
     const newTask: Task = {
@@ -70,7 +69,7 @@ export function useTasks() {
     };
 
     setTasks((prev) => [...prev, newTask]);
-    return true;
+    return { success: true };
   };
 
   const toggleTaskComplete = (taskId: string) => {

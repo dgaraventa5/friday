@@ -11,10 +11,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { TaskErrorBoundary } from './components/TaskErrorBoundary';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { LoadingState } from './components/LoadingState';
-import { Task } from './types/task';
+import { Task, AddTaskResult } from './types/task';
 import { useState, useEffect, useRef } from 'react';
 import { isToday } from 'date-fns';
-import { assignStartDates } from './utils/taskPrioritization';
+import { assignStartDates, checkCategoryLimits } from './utils/taskPrioritization';
 import { BottomNav } from './components/BottomNav';
 import { SchedulePage } from './components/SchedulePage';
 import { EditTaskModal } from './components/EditTaskModal';
@@ -164,7 +164,12 @@ function AppContent() {
   };
 
   // Add a new task and handle onboarding flag
-  const handleAddTask = (task: Task) => {
+  const handleAddTask = (task: Task): AddTaskResult => {
+    const limitCheck = checkCategoryLimits(tasks, task);
+    if (!limitCheck.allowed) {
+      return { success: false, message: limitCheck.message };
+    }
+
     dispatch({ type: 'ADD_TASK', payload: task });
     setIsTaskInputExpanded(false);
 
@@ -181,6 +186,8 @@ function AppContent() {
         console.log('Directly updated localStorage onboarding status to true');
       }
     }
+
+    return { success: true };
   };
 
   // Handle task editing
