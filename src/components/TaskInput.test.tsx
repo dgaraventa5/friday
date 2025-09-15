@@ -1,17 +1,17 @@
 /** @jest-environment jsdom */
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { TaskInput } from './TaskInput';
-import { Category, AddTaskResult } from '../types/task';
+import { Category, Task, AddTaskResult } from '../types/task';
 
-test('shows error message when task addition fails', () => {
+test('shows error message when task addition fails', async () => {
   const categories: Category[] = [
     { id: '1', name: 'Work', color: '#fff', dailyLimit: 1, icon: 'briefcase' },
   ];
-  const onAddTask = jest.fn((): AddTaskResult => ({
+  const onAddTask = jest.fn<Promise<AddTaskResult>, [Task]>().mockResolvedValue({
     success: false,
     message: 'Limit reached',
-  }));
+  });
 
   render(
     <TaskInput categories={categories} onAddTask={onAddTask} isExpanded />,
@@ -25,6 +25,6 @@ test('shows error message when task addition fails', () => {
   });
   fireEvent.click(screen.getByRole('button', { name: /add task/i }));
 
-  expect(onAddTask).toHaveBeenCalled();
-  expect(screen.getByRole('alert')).toHaveTextContent('Limit reached');
+  await waitFor(() => expect(onAddTask).toHaveBeenCalled());
+  expect(await screen.findByRole('alert')).toHaveTextContent('Limit reached');
 });

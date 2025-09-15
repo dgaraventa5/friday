@@ -8,9 +8,11 @@ import { Task, Category, AddTaskResult } from '../types/task';
 import { FormField } from './FormField';
 import { validateTask, ValidationError } from '../utils/validation';
 
+type MaybePromise<T> = T | Promise<T>;
+
 interface TaskInputProps {
   categories: Category[];
-  onAddTask: (task: Task) => AddTaskResult;
+  onAddTask: (task: Task) => MaybePromise<AddTaskResult>;
   onCancel?: () => void;
   isExpanded?: boolean;
   submitLabel?: string;
@@ -50,12 +52,14 @@ export function TaskInput({
   const handleChange = (field: keyof Task, value: Task[keyof Task]) => {
     setTask((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => prev.filter((error) => error.field !== field));
+    setSubmitError(null);
   };
 
   // Handle form submit: validate, create new Task, call onAddTask
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
     const validation = validateTask(task);
     if (!validation.isValid) {
@@ -88,29 +92,35 @@ export function TaskInput({
       startDate: new Date(), // Set startDate to current date instead of undefined
     };
 
-    const result = onAddTask(newTask);
-    if (!result.success) {
-      setSubmitError(result.message || 'Unable to add task');
-      setIsSubmitting(false);
-      return;
-    }
+    try {
+      const result = await Promise.resolve(onAddTask(newTask));
+      if (!result.success) {
+        setSubmitError(result.message || 'Unable to add task');
+        return;
+      }
 
-    // Reset form state
-    setTask({
-      name: '',
-      category: undefined,
-      dueDate: new Date(),
-      estimatedHours: 1,
-      importance: 'not-important',
-      urgency: 'not-urgent',
-      isRecurring: false,
-      recurringEndType: 'never',
-      recurringEndCount: 1,
-      recurringCurrentCount: 0,
-    });
-    setErrors([]);
-    setSubmitError(null);
-    setIsSubmitting(false);
+      // Reset form state
+      setTask({
+        name: '',
+        category: undefined,
+        dueDate: new Date(),
+        estimatedHours: 1,
+        importance: 'not-important',
+        urgency: 'not-urgent',
+        isRecurring: false,
+        recurringEndType: 'never',
+        recurringEndCount: 1,
+        recurringCurrentCount: 0,
+      });
+      setErrors([]);
+      setSubmitError(null);
+      setShowRecurrence(false);
+    } catch (error) {
+      console.error('Failed to add task', error);
+      setSubmitError('Unable to add task');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Handle cancel/close
@@ -128,6 +138,7 @@ export function TaskInput({
       recurringCurrentCount: 0,
     });
     setSubmitError(null);
+    setShowRecurrence(false);
     onCancel?.();
   };
 

@@ -164,7 +164,7 @@ function AppContent() {
   };
 
   // Add a new task and handle onboarding flag
-  const handleAddTask = (task: Task): AddTaskResult => {
+  const handleAddTask = async (task: Task): Promise<AddTaskResult> => {
     const limitCheck = checkCategoryLimits(tasks, task);
     if (!limitCheck.allowed) {
       return { success: false, message: limitCheck.message };

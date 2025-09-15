@@ -51,9 +51,9 @@ export function useTasks() {
     }
   }, [preferences, loading]);
 
-  const addTask = (
+  const addTask = async (
     taskData: Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt'>,
-  ): AddTaskResult => {
+  ): Promise<AddTaskResult> => {
     // Check category limits
     const limitCheck = checkCategoryLimits(tasks, { ...taskData } as Task);
     if (!limitCheck.allowed) {
