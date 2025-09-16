@@ -1,3 +1,4 @@
+import './index.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
@@ -8,7 +9,6 @@ import {
 } from 'react-router-dom';
 import App from './App.tsx';
 import OnboardingPage from './routes/Onboarding';
-import './index.css';
 
 const onboardingEnabled = import.meta.env.VITE_ONBOARDING_V1 === 'true';
 
