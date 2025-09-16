@@ -41,3 +41,8 @@ export interface TaskScore {
   daysOverdue: number;
   priority: number;
 }
+
+export interface AddTaskResult {
+  success: boolean;
+  message?: string;
+}

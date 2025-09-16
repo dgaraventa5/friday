@@ -14,7 +14,12 @@ jest.mock('../context/AuthContext', () => ({
 
 jest.mock('../context/AppContext', () => ({
   useApp: () => ({
-    state: { categories: [{ id: '1', name: 'Work', color: '#fff', dailyLimit: 1, icon: 'briefcase' }] },
+    state: {
+      categories: [
+        { id: '1', name: 'Work', color: '#fff', dailyLimit: 1, icon: 'briefcase' },
+      ],
+      tasks: [],
+    },
     dispatch: jest.fn(),
   }),
 }));
