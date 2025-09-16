@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './Button';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -8,6 +9,7 @@ export function LoginPage() {
   const { authState, signIn } = useAuth();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const shouldReduceMotion = useReducedMotion();
 
   const handleGoogleSignIn = async () => {
     try {
@@ -80,13 +82,22 @@ export function LoginPage() {
     <div className="flex flex-col min-h-screen text-gray-800">
       {/* Hero Section */}
       <header className="px-4 py-20 bg-white text-center">
-        <h1 className="text-4xl font-bold mb-4">👋 Welcome to Friday</h1>
-        <p className="text-xl mb-2">A calmer way to run your day.</p>
-        <p className="max-w-2xl mx-auto text-gray-600">
-          A focused to-do list app designed for busy professionals and
-          neurodivergent users seeking a low-stress way to manage daily
-          priorities.
-        </p>
+        <motion.div
+          initial={{
+            opacity: shouldReduceMotion ? 1 : 0,
+            y: shouldReduceMotion ? 0 : 16,
+          }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        >
+          <h1 className="text-4xl font-bold mb-4">👋 Welcome to Friday</h1>
+          <p className="text-xl mb-2">A calmer way to run your day.</p>
+          <p className="max-w-2xl mx-auto text-gray-600">
+            A focused to-do list app designed for busy professionals and
+            neurodivergent users seeking a low-stress way to manage daily
+            priorities.
+          </p>
+        </motion.div>
         <img
           src="/hero-demo.svg"
           width={720}
@@ -95,7 +106,21 @@ export function LoginPage() {
           alt="Preview of the Friday dashboard showing prioritized tasks"
           className="max-w-xs sm:max-w-sm md:max-w-md w-full mx-auto mt-10 rounded-2xl border border-slate-200 shadow-lg"
         />
-        <div className="mt-8 flex justify-center">{SignInButton}</div>
+        <motion.div
+          className="mt-8 flex justify-center"
+          initial={{
+            opacity: shouldReduceMotion ? 1 : 0,
+            y: shouldReduceMotion ? 0 : 24,
+          }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut', delay: 0.15 }}
+          whileHover={
+            shouldReduceMotion ? undefined : { scale: 1.02, y: -2 }
+          }
+          whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+        >
+          {SignInButton}
+        </motion.div>
         {error && (
           <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
             {error}
