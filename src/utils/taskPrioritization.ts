@@ -150,6 +150,7 @@ export const DEFAULT_CATEGORY_LIMITS: Record<string, { max: number }> = {
   Work: { max: 10 },
   Home: { max: 3 },
   Health: { max: 3 },
+  Personal: { max: 3 },
 };
 
 function isWeekend(date: Date) {
