@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="img" aria-labelledby="title desc">
+  <title id="title">Friday productivity app preview</title>
+  <desc id="desc">Illustration of the Friday app showing a dashboard with tasks and categories.</desc>
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="100%" stop-color="#e0f2fe" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#cbd5f5" flood-opacity="0.6" />
+    </filter>
+    <style>
+      .label { font: 500 26px 'Inter', 'Segoe UI', sans-serif; fill: #1f2937; }
+      .task { font: 400 20px 'Inter', 'Segoe UI', sans-serif; fill: #334155; }
+    </style>
+  </defs>
+  <rect width="960" height="640" fill="url(#bgGradient)" rx="32" />
+  <g transform="translate(120 96)" filter="url(#shadow)">
+    <rect width="720" height="480" fill="#ffffff" rx="32" />
+    <rect x="40" y="36" width="640" height="72" rx="16" fill="#f1f5f9" />
+    <text x="64" y="82" class="label">Today&apos;s Focus</text>
+    <g transform="translate(40 140)">
+      <rect width="640" height="96" rx="20" fill="#eef2ff" />
+      <circle cx="56" cy="48" r="22" fill="#a855f7" opacity="0.8" />
+      <text x="96" y="46" class="label" font-size="24">Prepare client review</text>
+      <text x="96" y="76" class="task">Urgent • Work • Due today</text>
+    </g>
+    <g transform="translate(40 264)">
+      <rect width="640" height="96" rx="20" fill="#ecfeff" />
+      <circle cx="56" cy="48" r="22" fill="#0ea5e9" opacity="0.8" />
+      <text x="96" y="46" class="label" font-size="24">Plan weekly meals</text>
+      <text x="96" y="76" class="task">Important • Home • Due tomorrow</text>
+    </g>
+    <g transform="translate(40 388)">
+      <rect width="640" height="72" rx="20" fill="#fef3c7" />
+      <circle cx="56" cy="36" r="22" fill="#f97316" opacity="0.8" />
+      <text x="96" y="44" class="label" font-size="22">Book physical therapy</text>
+      <text x="96" y="70" class="task">Health • Schedule for Friday</text>
+    </g>
+  </g>
+</svg>

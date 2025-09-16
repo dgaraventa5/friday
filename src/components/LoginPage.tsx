@@ -87,6 +87,14 @@ export function LoginPage() {
           neurodivergent users seeking a low-stress way to manage daily
           priorities.
         </p>
+        <img
+          src="/hero-demo.svg"
+          width={720}
+          height={480}
+          loading="lazy"
+          alt="Preview of the Friday dashboard showing prioritized tasks"
+          className="max-w-xs sm:max-w-sm md:max-w-md w-full mx-auto mt-10 rounded-2xl border border-slate-200 shadow-lg"
+        />
         <div className="mt-8 flex justify-center">{SignInButton}</div>
         {error && (
           <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
