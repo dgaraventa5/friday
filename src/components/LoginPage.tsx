@@ -26,7 +26,7 @@ export function LoginPage() {
     <Button
       onClick={handleGoogleSignIn}
       disabled={isLoggingIn || authState.loading}
-      className="flex items-center justify-center space-x-2"
+      className="group flex items-center justify-center space-x-3 px-6 py-3 font-semibold text-white transform bg-gradient-to-r from-primary-500 via-blue-500 to-primary-600 shadow-[0_12px_30px_rgba(37,99,235,0.35)] transition-all duration-200 ease-out hover:scale-105 hover:translate-y-0 hover:from-primary-500 hover:via-indigo-500 hover:to-primary-700"
     >
       {isLoggingIn || authState.loading ? (
         <LoadingSpinner size="sm" />
@@ -50,7 +50,26 @@ export function LoginPage() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          <span>Get Started – Free</span>
+          <span className="tracking-tight">Get Started – Free</span>
+          <span
+            aria-hidden="true"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white transition-all duration-200 ease-out animate-pulse-soft group-hover:animate-none group-hover:translate-x-1 group-hover:scale-110"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 20 20"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 10h10m0 0-3.5-3.5M15 10l-3.5 3.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
         </>
       )}
     </Button>
