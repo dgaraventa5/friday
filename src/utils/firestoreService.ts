@@ -18,6 +18,7 @@ import {
   Firestore,
 } from 'firebase/firestore';
 import { app } from './firebase';
+import logger from './logger';
 import { Task } from '../types/task';
 import { Category } from '../types/task';
 import { UserPreferences } from '../types/user';
@@ -66,12 +67,12 @@ const initializeFirestoreWithAppropriateCache = async () => {
     const isPrivate = await isPrivateBrowsing();
     const isMobile = isMobileBrowser();
 
-    console.log(
+    logger.log(
       `[Firestore] Environment: Mobile: ${isMobile}, Private Browsing: ${isPrivate}`,
     );
 
     if (isMobile || isPrivate) {
-      console.log(
+      logger.log(
         '[Firestore] Mobile or private browsing detected, using memory cache',
       );
       persistenceType = 'memory';
@@ -79,7 +80,7 @@ const initializeFirestoreWithAppropriateCache = async () => {
         localCache: memoryLocalCache(),
       });
     } else {
-      console.log(
+      logger.log(
         '[Firestore] Desktop browser detected, using persistent cache',
       );
       persistenceType = 'indexeddb';
@@ -91,13 +92,13 @@ const initializeFirestoreWithAppropriateCache = async () => {
 
       // Try to enable offline persistence with better error handling
       try {
-        console.log('[Firestore] Enabling offline persistence');
+        logger.log('[Firestore] Enabling offline persistence');
         // Note: The db object is already configured with persistentLocalCache above
         // We don't need to call enableIndexedDbPersistence separately as it's now handled
         // by the persistentLocalCache configuration
 
         // Log success
-        console.log(
+        logger.log(
           '[Firestore] Offline persistence enabled via persistentLocalCache',
         );
       } catch (error) {
@@ -115,11 +116,11 @@ const initializeFirestoreWithAppropriateCache = async () => {
         import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || '8080',
         10,
       );
-      console.log(`[Firestore] Using emulator at ${host}:${port}`);
+      logger.log(`[Firestore] Using emulator at ${host}:${port}`);
       connectFirestoreEmulator(db, host, port);
     }
   } catch (error) {
-    console.warn(
+    logger.warn(
       '[Firestore] Failed to initialize with appropriate cache, falling back to memory cache',
       error,
     );
@@ -195,12 +196,12 @@ export async function saveTasksToFirestore(
 ): Promise<void> {
   try {
     if (!isFirestoreAvailable) {
-      console.log('[Firestore] Falling back to localStorage for saving tasks');
+      logger.log('[Firestore] Falling back to localStorage for saving tasks');
       saveTasks(tasks, `user_${userId}_`);
       return;
     }
 
-    console.log(`[Firestore] Saving ${tasks.length} tasks for user: ${userId}`);
+    logger.log(`[Firestore] Saving ${tasks.length} tasks for user: ${userId}`);
     const batch = writeBatch(db);
 
     // Delete existing tasks first
@@ -222,14 +223,14 @@ export async function saveTasksToFirestore(
 
       // Debug log for completed tasks
       if (task.completed) {
-        console.log('[Firestore] Saving completed task:', task.name, task.id);
+        logger.log('[Firestore] Saving completed task:', task.name, task.id);
       }
 
       batch.set(taskRef, taskWithUser);
     });
 
     await batch.commit();
-    console.log(`[Firestore] Successfully saved ${tasks.length} tasks`);
+    logger.log(`[Firestore] Successfully saved ${tasks.length} tasks`);
 
     // Save a timestamp of last successful Firestore sync
     localStorage.setItem(
@@ -248,17 +249,17 @@ export async function saveTasksToFirestore(
 export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
   try {
     // Debug log to track user ID
-    console.log(
+    logger.log(
       '[Firestore DEBUG] loadTasksFromFirestore for user ID:',
       userId,
     );
 
     if (!isFirestoreAvailable) {
-      console.log('[Firestore] Falling back to localStorage for loading tasks');
+      logger.log('[Firestore] Falling back to localStorage for loading tasks');
       return loadTasks(`user_${userId}_`);
     }
 
-    console.log(
+    logger.log(
       `[Firestore] Loading tasks for user: ${userId} with persistence type: ${persistenceType}`,
     );
 
@@ -268,7 +269,7 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
 
     try {
       const querySnapshot = await getDocs(q);
-      console.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
+      logger.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
 
       if (querySnapshot.size > 0) {
         const tasks: Task[] = [];
@@ -285,19 +286,19 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
             taskIds.add(taskWithoutUserId.id);
             tasks.push(taskWithoutUserId as Task);
           } else {
-            console.warn(
+            logger.warn(
               `[Firestore] Duplicate task ID detected: ${taskWithoutUserId.id}, skipping`,
             );
           }
         });
 
-        console.log(
+        logger.log(
           `[Firestore] Returning ${tasks.length} unique tasks (filtered from ${querySnapshot.size})`,
         );
 
         // Update local storage as backup
         saveTasks(tasks, `user_${userId}_`);
-        console.log(
+        logger.log(
           `[Firestore] Saved ${tasks.length} tasks to localStorage as backup`,
         );
 
@@ -310,7 +311,7 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
         return tasks;
       }
     } catch (serverError) {
-      console.warn(
+      logger.warn(
         '[Firestore] Error fetching from server, will try local storage:',
         serverError,
       );
@@ -319,7 +320,7 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
     // If server fetch failed or returned no results, try local storage
     const localTasks = loadTasks(`user_${userId}_`);
     if (localTasks.length > 0) {
-      console.log(
+      logger.log(
         `[Firestore] Using ${localTasks.length} tasks from localStorage`,
       );
 
@@ -336,7 +337,7 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
       return localTasks;
     }
 
-    console.log('[Firestore] No tasks found in server or localStorage');
+    logger.log('[Firestore] No tasks found in server or localStorage');
     return [];
   } catch (error) {
     console.error('Error loading tasks from Firestore:', error);
@@ -353,14 +354,14 @@ export async function saveCategoriesToFirestore(
 ): Promise<void> {
   try {
     if (!isFirestoreAvailable) {
-      console.log(
+      logger.log(
         '[Firestore] Falling back to localStorage for saving categories',
       );
       saveCategories(categories, `user_${userId}_`);
       return;
     }
 
-    console.log(
+    logger.log(
       `[Firestore] Saving ${categories.length} categories for user: ${userId}`,
     );
 
@@ -371,7 +372,7 @@ export async function saveCategoriesToFirestore(
       userId,
     });
 
-    console.log(
+    logger.log(
       `[Firestore] Successfully saved ${categories.length} categories`,
     );
 
@@ -394,23 +395,23 @@ export async function loadCategoriesFromFirestore(
 ): Promise<Category[]> {
   try {
     if (!isFirestoreAvailable) {
-      console.log(
+      logger.log(
         '[Firestore] Falling back to localStorage for loading categories',
       );
       return loadCategories(`user_${userId}_`);
     }
 
-    console.log(`[Firestore] Loading categories for user: ${userId}`);
+    logger.log(`[Firestore] Loading categories for user: ${userId}`);
     const categoriesRef = doc(db, COLLECTIONS.CATEGORIES, userId);
     const docSnap = await getDoc(categoriesRef);
 
     if (!docSnap.exists()) {
-      console.log('[Firestore] No categories found');
+      logger.log('[Firestore] No categories found');
 
       // Check if we have local categories to sync to Firestore
       const localCategories = loadCategories(`user_${userId}_`);
       if (localCategories.length > 0) {
-        console.log(
+        logger.log(
           `[Firestore] Using ${localCategories.length} categories from localStorage`,
         );
 
@@ -438,7 +439,7 @@ export async function loadCategoriesFromFirestore(
         )
       : [];
 
-    console.log(`[Firestore] Loaded ${categories.length} categories`);
+    logger.log(`[Firestore] Loaded ${categories.length} categories`);
 
     // Update last sync timestamp
     localStorage.setItem(
@@ -462,20 +463,20 @@ export async function savePreferencesToFirestore(
 ): Promise<void> {
   try {
     if (!isFirestoreAvailable) {
-      console.log(
+      logger.log(
         '[Firestore] Falling back to localStorage for saving preferences',
       );
       savePreferences(preferences, `user_${userId}_`);
       return;
     }
 
-    console.log(`[Firestore] Saving preferences for user: ${userId}`);
+    logger.log(`[Firestore] Saving preferences for user: ${userId}`);
     const userPreferencesRef = doc(db, COLLECTIONS.PREFERENCES, userId);
     await setDoc(userPreferencesRef, {
       ...prepareForFirestore(preferences),
       userId,
     });
-    console.log('[Firestore] Preferences saved successfully');
+    logger.log('[Firestore] Preferences saved successfully');
 
     // Also save to localStorage as backup
     savePreferences(preferences, `user_${userId}_`);
@@ -493,29 +494,29 @@ export async function loadPreferencesFromFirestore(
 ): Promise<UserPreferences | null> {
   try {
     if (!isFirestoreAvailable) {
-      console.log(
+      logger.log(
         '[Firestore] Falling back to localStorage for loading preferences',
       );
       return loadPreferences(`user_${userId}_`);
     }
 
-    console.log(`[Firestore] Loading preferences for user: ${userId}`);
+    logger.log(`[Firestore] Loading preferences for user: ${userId}`);
     const userPreferencesRef = doc(db, COLLECTIONS.PREFERENCES, userId);
     const docSnap = await getDoc(userPreferencesRef);
 
     if (!docSnap.exists()) {
-      console.log('[Firestore] No preferences found');
+      logger.log('[Firestore] No preferences found');
       // Try localStorage
       const localPreferences = loadPreferences(`user_${userId}_`);
       if (localPreferences) {
-        console.log('[Firestore] Using preferences from localStorage');
+        logger.log('[Firestore] Using preferences from localStorage');
         return localPreferences;
       }
       return null;
     }
 
     const data = convertTimestamps(docSnap.data());
-    console.log('[Firestore] Preferences found');
+    logger.log('[Firestore] Preferences found');
     // Remove userId field as it's not part of the UserPreferences interface
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { userId: _prefUserId, ...preferencesWithoutUserId } = data;
@@ -535,20 +536,20 @@ export async function saveOnboardingStatusToFirestore(
 ): Promise<void> {
   try {
     if (!isFirestoreAvailable) {
-      console.log(
+      logger.log(
         '[Firestore] Falling back to localStorage for saving onboarding status',
       );
       localStorage.setItem(
         `user_${userId}_onboarding_complete`,
         String(completed),
       );
-      console.log(
+      logger.log(
         `[Firestore] Saved onboarding status to localStorage: ${completed}`,
       );
       return;
     }
 
-    console.log(
+    logger.log(
       `[Firestore] Saving onboarding status for user: ${userId}, value: ${completed}`,
     );
     const userPreferencesRef = doc(db, COLLECTIONS.PREFERENCES, userId);
@@ -561,7 +562,7 @@ export async function saveOnboardingStatusToFirestore(
       },
       { merge: true },
     );
-    console.log(
+    logger.log(
       '[Firestore] Onboarding status saved successfully to Firestore',
     );
 
@@ -584,7 +585,7 @@ export async function saveOnboardingStatusToFirestore(
       `user_${userId}_onboarding_complete`,
       String(completed),
     );
-    console.log(
+    logger.log(
       `[Firestore] Fallback saved onboarding status to localStorage: ${completed}`,
     );
   }
@@ -596,27 +597,27 @@ export async function loadOnboardingStatusFromFirestore(
 ): Promise<boolean> {
   try {
     if (!isFirestoreAvailable) {
-      console.log(
+      logger.log(
         '[Firestore] Falling back to localStorage for loading onboarding status',
       );
       const localStatus =
         localStorage.getItem(`user_${userId}_onboarding_complete`) === 'true';
-      console.log(`[Firestore] Local onboarding status: ${localStatus}`);
+      logger.log(`[Firestore] Local onboarding status: ${localStatus}`);
       return localStatus;
     }
 
-    console.log(`[Firestore] Loading onboarding status for user: ${userId}`);
+    logger.log(`[Firestore] Loading onboarding status for user: ${userId}`);
     const userPreferencesRef = doc(db, COLLECTIONS.PREFERENCES, userId);
     const docSnap = await getDoc(userPreferencesRef);
 
     if (!docSnap.exists()) {
-      console.log(
+      logger.log(
         '[Firestore] No preferences document found, checking localStorage',
       );
       // Try localStorage
       const localOnboardingComplete =
         localStorage.getItem(`user_${userId}_onboarding_complete`) === 'true';
-      console.log(
+      logger.log(
         `[Firestore] Using onboarding status from localStorage: ${localOnboardingComplete}`,
       );
 
@@ -638,7 +639,7 @@ export async function loadOnboardingStatusFromFirestore(
     // Check if onboarding_complete exists and is a boolean
     if (data.onboarding_complete !== undefined) {
       const onboardingComplete = data.onboarding_complete === true;
-      console.log(
+      logger.log(
         `[Firestore] Onboarding status found in preferences: ${onboardingComplete}`,
       );
 
@@ -654,13 +655,13 @@ export async function loadOnboardingStatusFromFirestore(
 
       return onboardingComplete;
     } else {
-      console.log(
+      logger.log(
         '[Firestore] No onboarding status in preferences, checking localStorage',
       );
       // If not in Firestore, try localStorage
       const localOnboardingComplete =
         localStorage.getItem(`user_${userId}_onboarding_complete`) === 'true';
-      console.log(
+      logger.log(
         `[Firestore] Using onboarding status from localStorage: ${localOnboardingComplete}`,
       );
 
@@ -683,7 +684,7 @@ export async function loadOnboardingStatusFromFirestore(
     // Fallback to localStorage
     const localStatus =
       localStorage.getItem(`user_${userId}_onboarding_complete`) === 'true';
-    console.log(
+    logger.log(
       `[Firestore] Error fallback, using localStorage: ${localStatus}`,
     );
     return localStatus;
@@ -696,17 +697,17 @@ export async function migrateLocalStorageToFirestore(
 ): Promise<void> {
   try {
     if (!isFirestoreAvailable) {
-      console.log('[Firestore] Firestore not available, skipping migration');
+      logger.log('[Firestore] Firestore not available, skipping migration');
       return;
     }
 
-    console.log(`[Firestore] Starting migration for user: ${userId}`);
+    logger.log(`[Firestore] Starting migration for user: ${userId}`);
     const userPrefix = `user_${userId}_`;
 
     // Check if we've already migrated
     const migrationKey = `${userPrefix}migration_completed`;
     if (localStorage.getItem(migrationKey) === 'true') {
-      console.log('[Firestore] Migration already completed for this user');
+      logger.log('[Firestore] Migration already completed for this user');
       return;
     }
 
@@ -723,14 +724,14 @@ export async function migrateLocalStorageToFirestore(
     const localOnboardingComplete =
       localStorage.getItem(`${userPrefix}onboarding_complete`) === 'true';
 
-    console.log(`[Firestore] Found ${localTasks.length} tasks in localStorage`);
-    console.log(
+    logger.log(`[Firestore] Found ${localTasks.length} tasks in localStorage`);
+    logger.log(
       `[Firestore] Found ${localCategories.length} categories in localStorage`,
     );
-    console.log(
+    logger.log(
       `[Firestore] Found preferences in localStorage: ${!!localPreferences}`,
     );
-    console.log(
+    logger.log(
       `[Firestore] Found onboarding status in localStorage: ${localOnboardingComplete}`,
     );
 
@@ -751,34 +752,34 @@ export async function migrateLocalStorageToFirestore(
 
     // Save data to Firestore
     if (parsedTasks.length > 0) {
-      console.log(
+      logger.log(
         `[Firestore] Saving ${parsedTasks.length} tasks to Firestore`,
       );
       await saveTasksToFirestore(userId, parsedTasks as Task[]);
     }
 
     if (localCategories.length > 0) {
-      console.log(
+      logger.log(
         `[Firestore] Saving ${localCategories.length} categories to Firestore`,
       );
       await saveCategoriesToFirestore(userId, localCategories as Category[]);
     }
 
     if (localPreferences) {
-      console.log('[Firestore] Saving preferences to Firestore');
+      logger.log('[Firestore] Saving preferences to Firestore');
       await savePreferencesToFirestore(
         userId,
         localPreferences as UserPreferences,
       );
     }
 
-    console.log('[Firestore] Saving onboarding status to Firestore');
+    logger.log('[Firestore] Saving onboarding status to Firestore');
     await saveOnboardingStatusToFirestore(userId, localOnboardingComplete);
 
     // Mark migration as completed
     localStorage.setItem(migrationKey, 'true');
 
-    console.log('[Firestore] Migration completed successfully');
+    logger.log('[Firestore] Migration completed successfully');
   } catch (error) {
     console.error('[Firestore] Error during migration:', error);
     isFirestoreAvailable = false;
@@ -792,12 +793,12 @@ export { db, convertTimestamps };
 // Migrate tasks from localStorage to Firestore
 export async function migrateTasksToFirestore(userId: string): Promise<void> {
   try {
-    console.log('[Firestore] Checking for tasks to migrate');
+    logger.log('[Firestore] Checking for tasks to migrate');
     const userPrefix = `user_${userId}_`;
     const localTasks = loadTasks(userPrefix);
 
     if (localTasks && localTasks.length > 0) {
-      console.log(
+      logger.log(
         `[Firestore] Migrating ${localTasks.length} tasks to Firestore`,
       );
 
@@ -823,12 +824,12 @@ export async function migrateTasksToFirestore(userId: string): Promise<void> {
       }
 
       await batch.commit();
-      console.log('[Firestore] Migration complete');
+      logger.log('[Firestore] Migration complete');
 
       // Clear local storage after successful migration
       saveTasks([], userPrefix);
     } else {
-      console.log('[Firestore] No tasks to migrate');
+      logger.log('[Firestore] No tasks to migrate');
     }
   } catch (error) {
     console.error('[Firestore] Migration failed:', error);
@@ -839,7 +840,7 @@ export async function migrateTasksToFirestore(userId: string): Promise<void> {
 // Fetch tasks from Firestore for a specific user
 export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
   try {
-    console.log(`[Firestore] Fetching tasks for user ${userId}`);
+    logger.log(`[Firestore] Fetching tasks for user ${userId}`);
     const tasksQuery = query(
       collection(db, 'tasks'),
       where('userId', '==', userId),
@@ -856,7 +857,7 @@ export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
       tasks.push(task as Task);
     });
 
-    console.log(`[Firestore] Fetched ${tasks.length} tasks`);
+    logger.log(`[Firestore] Fetched ${tasks.length} tasks`);
     return tasks;
   } catch (error) {
     console.error('[Firestore] Error fetching tasks:', error);
@@ -864,7 +865,7 @@ export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
     // If fetching fails, try to return local tasks as fallback
     const userPrefix = `user_${userId}_`;
     const localTasks = loadTasks(userPrefix);
-    console.log(`[Firestore] Falling back to ${localTasks.length} local tasks`);
+    logger.log(`[Firestore] Falling back to ${localTasks.length} local tasks`);
     return localTasks;
   }
 }
@@ -876,7 +877,7 @@ export async function disableNetwork(): Promise<void> {
       'firebase/firestore'
     );
     await disableFirestoreNetwork(db);
-    console.log('[Firestore] Network disabled');
+    logger.log('[Firestore] Network disabled');
   } catch (error) {
     console.error('[Firestore] Failed to disable network:', error);
   }
@@ -889,7 +890,7 @@ export async function enableNetwork(): Promise<void> {
       'firebase/firestore'
     );
     await enableFirestoreNetwork(db);
-    console.log('[Firestore] Network enabled');
+    logger.log('[Firestore] Network enabled');
   } catch (error) {
     console.error('[Firestore] Failed to enable network:', error);
   }
@@ -898,10 +899,10 @@ export async function enableNetwork(): Promise<void> {
 // Force sync data from Firestore
 export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
   // Debug log to track user ID
-  console.log('[Firestore DEBUG] forceSyncFromFirestore for user ID:', userId);
+  logger.log('[Firestore DEBUG] forceSyncFromFirestore for user ID:', userId);
 
-  console.log('[Firestore] Starting force sync for user', userId);
-  console.log(`[Firestore] Current persistence type: ${persistenceType}`);
+  logger.log('[Firestore] Starting force sync for user', userId);
+  logger.log(`[Firestore] Current persistence type: ${persistenceType}`);
 
   // Track sync attempt for analytics/debugging
   const syncStartTime = Date.now();
@@ -910,7 +911,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
 
   // For mobile browsers, we'll use a more aggressive approach
   const isMobile = isMobileBrowser();
-  console.log(`[Firestore] Device type: ${isMobile ? 'Mobile' : 'Desktop'}`);
+  logger.log(`[Firestore] Device type: ${isMobile ? 'Mobile' : 'Desktop'}`);
 
   const attemptSync = async (): Promise<Task[]> => {
     try {
@@ -919,7 +920,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
         'firebase/firestore'
       );
       await enableFirestoreNetwork(db);
-      console.log('[Firestore] Network enabled for force sync');
+      logger.log('[Firestore] Network enabled for force sync');
 
       // Wait a moment to ensure connection is established
       // Use a longer timeout for mobile devices
@@ -927,7 +928,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
       await new Promise((resolve) => setTimeout(resolve, connectionDelay));
 
       // Fetch the latest tasks
-      console.log('[Firestore] Fetching latest data from server');
+      logger.log('[Firestore] Fetching latest data from server');
       const tasksQuery = query(
         collection(db, COLLECTIONS.TASKS),
         where('userId', '==', userId),
@@ -936,9 +937,9 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
       const querySnapshot = await getDocs(tasksQuery);
 
       // Debug log for query results
-      console.log('[Firestore DEBUG] Query executed with user ID:', userId);
-      console.log('[Firestore DEBUG] Query returned size:', querySnapshot.size);
-      console.log(
+      logger.log('[Firestore DEBUG] Query executed with user ID:', userId);
+      logger.log('[Firestore DEBUG] Query returned size:', querySnapshot.size);
+      logger.log(
         '[Firestore DEBUG] Query metadata fromCache:',
         querySnapshot.metadata.fromCache,
       );
@@ -948,7 +949,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
       querySnapshot.forEach((doc) => {
         const taskData = doc.data();
         // Log the user ID from the task data for debugging
-        console.log(
+        logger.log(
           '[Firestore DEBUG] Task user ID in document:',
           taskData.userId,
         );
@@ -962,7 +963,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
 
       // Verify the data was actually fetched from the server
       if (querySnapshot.metadata.fromCache && isMobile) {
-        console.warn(
+        logger.warn(
           '[Firestore] Data was served from cache, not server. Retrying...',
         );
         if (retryCount < MAX_RETRIES) {
@@ -974,7 +975,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
         }
       }
 
-      console.log(
+      logger.log(
         `[Firestore] Successfully fetched ${tasks.length} tasks from server`,
       );
 
@@ -992,20 +993,20 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
       // Verify the local storage was updated correctly
       const localVerification = loadTasks(userPrefix);
       if (localVerification.length !== tasks.length) {
-        console.warn(
+        logger.warn(
           '[Firestore] Local storage verification failed. Expected',
           tasks.length,
           'tasks but found',
           localVerification.length,
         );
       } else {
-        console.log('[Firestore] Local storage verification successful');
+        logger.log('[Firestore] Local storage verification successful');
       }
 
-      console.log(
+      logger.log(
         `[Firestore] Force synced ${tasks.length} tasks successfully`,
       );
-      console.log(
+      logger.log(
         `[Firestore] Sync completed in ${Date.now() - syncStartTime}ms`,
       );
 
@@ -1015,7 +1016,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
 
       if (retryCount < MAX_RETRIES) {
         retryCount++;
-        console.log(
+        logger.log(
           `[Firestore] Retrying sync (${retryCount}/${MAX_RETRIES})...`,
         );
         // Exponential backoff
@@ -1025,14 +1026,14 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
       }
 
       // If all retries failed, try to get data from local storage as fallback
-      console.log(
+      logger.log(
         '[Firestore] All sync attempts failed, falling back to local storage',
       );
       const userPrefix = `user_${userId}_`;
       const localTasks = loadTasks(userPrefix);
 
       if (localTasks.length > 0) {
-        console.log(
+        logger.log(
           `[Firestore] Retrieved ${localTasks.length} tasks from local storage`,
         );
         return localTasks;

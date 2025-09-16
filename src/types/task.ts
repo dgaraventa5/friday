@@ -28,19 +28,6 @@ export interface Category {
   icon: string;
 }
 
-export interface UserPreferences {
-  maxDailyTasks: number;
-  categories: Category[];
-  theme: 'light' | 'dark';
-  notifications: boolean;
-  categoryLimits?: Record<string, { max: number }>;
-  defaultView?: string;
-  notificationsEnabled?: boolean;
-  emailNotifications?: boolean;
-  defaultCategory?: string;
-  [key: string]: unknown; // Allow for additional preference fields
-}
-
 export type EisenhowerQuadrant =
   | 'urgent-important'
   | 'not-urgent-important'

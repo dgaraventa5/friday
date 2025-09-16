@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Task, Category, UserPreferences, AddTaskResult } from '../types/task';
+import { Task, Category } from '../types/task';
+import { UserPreferences } from '../types/user';
 import {
   saveTasks,
   loadTasks,
@@ -74,48 +75,41 @@ export function useTasks() {
 
   const toggleTaskComplete = (taskId: string) => {
     setTasks((prev) =>
-      prev.map((task) => {
-        if (task.id === taskId) {
-          const updatedTask = {
+      prev.flatMap((task) => {
+        if (task.id !== taskId) return [task];
+
+        const completed = !task.completed;
+        const updatedTask: Task = {
+          ...task,
+          completed,
+          completedAt: completed ? new Date() : undefined,
+          updatedAt: new Date(),
+          // When marking a task as complete, update its startDate to today
+          // This ensures it's counted in today's tasks for the progress circle
+          startDate: completed ? normalizeDate(new Date()) : task.startDate,
+        };
+
+        if (completed && task.isRecurring && task.recurringInterval) {
+          const nextDueDate = getNextRecurringDate(
+            task.dueDate,
+            task.recurringInterval,
+            task.recurringDays,
+          );
+
+          const recurringTask: Task = {
             ...task,
-            completed: !task.completed,
-            completedAt: !task.completed ? new Date() : undefined,
+            id: crypto.randomUUID(),
+            completed: false,
+            dueDate: nextDueDate,
+            createdAt: new Date(),
             updatedAt: new Date(),
-            // When marking a task as complete, update its startDate to today
-            // This ensures it's counted in today's tasks for the progress circle
-            startDate: !task.completed
-              ? normalizeDate(new Date())
-              : task.startDate,
+            completedAt: undefined,
           };
 
-          // Handle recurring tasks
-          if (!task.completed && task.isRecurring && task.recurringInterval) {
-            // Create next occurrence
-            const nextDueDate = getNextRecurringDate(
-              task.dueDate,
-              task.recurringInterval,
-              task.recurringDays,
-            );
-
-            const recurringTask: Task = {
-              ...task,
-              id: crypto.randomUUID(),
-              completed: false,
-              dueDate: nextDueDate,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              completedAt: undefined,
-            };
-
-            // Add the new recurring task
-            setTimeout(() => {
-              setTasks((current) => [...current, recurringTask]);
-            }, 100);
-          }
-
-          return updatedTask;
+          return [updatedTask, recurringTask];
         }
-        return task;
+
+        return [updatedTask];
       }),
     );
   };
