@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './Button';
 import { LoadingSpinner } from './LoadingSpinner';
+import { LayoutDashboard, ListChecks, Scale } from 'lucide-react';
 
 export function LoginPage() {
   const { authState, signIn } = useAuth();
@@ -89,6 +90,10 @@ export function LoginPage() {
             </h2>
             <div className="grid gap-8 md:grid-cols-3">
               <div className="text-center">
+                <ListChecks
+                  className="w-12 h-12 mx-auto mb-4 text-primary-600"
+                  aria-hidden="true"
+                />
                 <h3 className="font-semibold mb-2">
                   See only the four tasks that matter today
                 </h3>
@@ -98,6 +103,10 @@ export function LoginPage() {
                 </p>
               </div>
               <div className="text-center">
+                <LayoutDashboard
+                  className="w-12 h-12 mx-auto mb-4 text-primary-600"
+                  aria-hidden="true"
+                />
                 <h3 className="font-semibold mb-2">
                   Prioritize smartly with the Eisenhower Matrix
                 </h3>
@@ -107,6 +116,10 @@ export function LoginPage() {
                 </p>
               </div>
               <div className="text-center">
+                <Scale
+                  className="w-12 h-12 mx-auto mb-4 text-primary-600"
+                  aria-hidden="true"
+                />
                 <h3 className="font-semibold mb-2">
                   Keep balance across Work, Home, and Health
                 </h3>
