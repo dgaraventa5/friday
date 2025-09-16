@@ -140,45 +140,45 @@ export function LoginPage() {
             <h2 className="text-2xl font-bold text-center mb-10">
               Why Friday?
             </h2>
-            <div className="grid gap-8 md:grid-cols-3">
-              <div className="text-center">
+            <div className="grid gap-12 md:grid-cols-3 text-center">
+              <div className="flex flex-col items-center">
                 <ListChecks
-                  className="w-12 h-12 mx-auto mb-4 text-primary-600"
+                  className="w-16 h-16 mx-auto mb-6 text-primary-600"
                   aria-hidden="true"
                 />
                 <h3 className="font-semibold mb-2">
                   See only the four tasks that matter today
                 </h3>
-                <p className="text-gray-600">
-                  Reduce cognitive load and focus on what truly moves the
-                  needle.
-                </p>
+                <div className="flex flex-col gap-1 text-gray-600">
+                  <span>• Focus on the four priorities for today.</span>
+                  <span>• Keep your mental load calm and clear.</span>
+                </div>
               </div>
-              <div className="text-center">
+              <div className="flex flex-col items-center">
                 <LayoutDashboard
-                  className="w-12 h-12 mx-auto mb-4 text-primary-600"
+                  className="w-16 h-16 mx-auto mb-6 text-primary-600"
                   aria-hidden="true"
                 />
                 <h3 className="font-semibold mb-2">
                   Prioritize smartly with the Eisenhower Matrix
                 </h3>
-                <p className="text-gray-600">
-                  Our scoring looks at due date, importance, and urgency to
-                  surface high-impact work.
-                </p>
+                <div className="flex flex-col gap-1 text-gray-600">
+                  <span>• Score tasks by urgency, impact, and timing.</span>
+                  <span>• Surface the work that moves goals forward.</span>
+                </div>
               </div>
-              <div className="text-center">
+              <div className="flex flex-col items-center">
                 <Scale
-                  className="w-12 h-12 mx-auto mb-4 text-primary-600"
+                  className="w-16 h-16 mx-auto mb-6 text-primary-600"
                   aria-hidden="true"
                 />
                 <h3 className="font-semibold mb-2">
                   Keep balance across Work, Home, and Health
                 </h3>
-                <p className="text-gray-600">
-                  Set simple category limits so your day never tilts out of
-                  balance.
-                </p>
+                <div className="flex flex-col gap-1 text-gray-600">
+                  <span>• Set gentle limits across every life area.</span>
+                  <span>• Stay balanced without the burnout spiral.</span>
+                </div>
               </div>
             </div>
           </div>
