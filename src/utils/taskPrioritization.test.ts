@@ -52,7 +52,7 @@ describe('assignStartDates with recurring tasks', () => {
 });
 
 describe('assignStartDates category limits', () => {
-  it('counts completed task hours toward daily category limits', () => {
+  it('allows due tasks even when completed task hours meet the daily category limit', () => {
     const baseDate = normalizeDate(new Date('2025-09-04'));
     const homeCategory = {
       id: 'home',
@@ -119,12 +119,94 @@ describe('assignStartDates category limits', () => {
       baseDate,
     );
 
-    const nextDay = new Date(baseDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-
     const scheduledPendingTask = result.find((t) => t.id === '2')!;
     expect(scheduledPendingTask.startDate.getTime()).toBe(
-      nextDay.getTime(),
+      baseDate.getTime(),
+    );
+  });
+});
+
+describe('assignStartDates due tasks vs future high priority tasks', () => {
+  it('prioritizes tasks due on the current day before higher-scoring future tasks', () => {
+    const baseDate = normalizeDate(new Date('2025-09-01')); // Monday
+    const tomorrowDate = new Date(baseDate);
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const normalizedTomorrow = normalizeDate(tomorrowDate);
+    const dayAfterTomorrowDate = new Date(baseDate);
+    dayAfterTomorrowDate.setDate(dayAfterTomorrowDate.getDate() + 2);
+    const normalizedDayAfterTomorrow = normalizeDate(dayAfterTomorrowDate);
+    const nextWeekDate = new Date(baseDate);
+    nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+    const normalizedNextWeek = normalizeDate(nextWeekDate);
+
+    const workCategory = {
+      id: 'work',
+      name: 'Work',
+      color: 'blue',
+      dailyLimit: 4,
+      icon: '💼',
+    };
+
+    const completedBlocker: Task = {
+      id: 'completed-blocker',
+      name: 'Completed task',
+      category: workCategory,
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: baseDate,
+      startDate: baseDate,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+      completed: true,
+      estimatedHours: 1,
+    };
+
+    const lowImportanceDueTomorrow: Task = {
+      id: 'low-tomorrow',
+      name: 'Low importance due tomorrow',
+      category: workCategory,
+      importance: 'not-important',
+      urgency: 'not-urgent',
+      dueDate: normalizedTomorrow,
+      startDate: normalizedTomorrow,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+      completed: false,
+      estimatedHours: 1,
+    };
+
+    const highImportanceNextWeek: Task = {
+      id: 'high-next-week',
+      name: 'High importance due next week',
+      category: workCategory,
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: normalizedNextWeek,
+      startDate: normalizedNextWeek,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+      completed: false,
+      estimatedHours: 1,
+    };
+
+    const result = assignStartDates(
+      [completedBlocker, lowImportanceDueTomorrow, highImportanceNextWeek],
+      1,
+      DEFAULT_CATEGORY_LIMITS,
+      baseDate,
+    );
+
+    const lowAssignment = result.find((t) => t.id === 'low-tomorrow')!;
+    const highAssignment = result.find((t) => t.id === 'high-next-week')!;
+
+    expect(lowAssignment.startDate.getTime()).toBe(
+      normalizedTomorrow.getTime(),
+    );
+    expect(highAssignment.startDate.getTime()).toBe(
+      normalizedDayAfterTomorrow.getTime(),
+    );
+    expect(lowAssignment.startDate.getTime()).toBeLessThan(
+      highAssignment.startDate.getTime(),
     );
   });
 });

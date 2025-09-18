@@ -342,6 +342,7 @@ export function assignStartDates(
     };
     let totalTasks = 0;
     let scheduledAny = true;
+    const normalizedCurrentTime = normalizedCurrentDate.getTime();
 
     // True greedy fill for non-recurring tasks, respecting the remaining capacity
     while (
@@ -350,28 +351,47 @@ export function assignStartDates(
       unassigned.length > 0
     ) {
       scheduledAny = false;
-      for (let i = 0; i < unassigned.length; ) {
-        if (totalTasks >= remainingCapacity) break;
-        const task = unassigned[i];
+      const dueNowTasks = unassigned.filter(
+        (task) => task.dueDate.getTime() <= normalizedCurrentTime,
+      );
+      const futureTasks = unassigned.filter(
+        (task) => task.dueDate.getTime() > normalizedCurrentTime,
+      );
+      const selectionOrder = [...dueNowTasks, ...futureTasks];
+
+      for (const task of selectionOrder) {
+        if (totalTasks >= remainingCapacity) {
+          break;
+        }
+
+        const unassignedIndex = unassigned.findIndex((t) => t.id === task.id);
+        if (unassignedIndex === -1) {
+          continue;
+        }
+
         const cat = task.category?.name || 'Other';
         const cap = categoryLimits[cat] || { max: Infinity };
         const used = categoryHours[cat] || 0;
-        // Skip Work tasks on weekends
-        if (isWknd && cat === 'Work') {
-          i++;
+        const estimatedHours = task.estimatedHours || 1;
+        const isDueNow = task.dueDate.getTime() <= normalizedCurrentTime;
+
+        // Skip Work tasks on weekends only if they aren't due now
+        if (isWknd && cat === 'Work' && !isDueNow) {
           continue;
         }
-        if (used + (task.estimatedHours || 1) <= cap.max) {
-          currentBucket.push(task);
-          categoryHours[cat] = used + (task.estimatedHours || 1);
-          totalTasks++;
-          unassigned.splice(i, 1); // Remove scheduled task
-          scheduledAny = true;
-          // After scheduling, restart the loop for the current day
-          i = 0;
-        } else {
-          i++;
+
+        const withinCategoryLimit = used + estimatedHours <= cap.max;
+        if (!withinCategoryLimit && !isDueNow) {
+          continue;
         }
+
+        currentBucket.push(task);
+        categoryHours[cat] = used + estimatedHours;
+        totalTasks++;
+        unassigned.splice(unassignedIndex, 1);
+        scheduledAny = true;
+        // Recalculate ordering after each assignment so due/overdue tasks always run first
+        break;
       }
     }
 
