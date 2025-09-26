@@ -129,12 +129,21 @@ export function checkCategoryLimits(
   tasks: Task[],
   newTask: Task,
 ): { allowed: boolean; message?: string } {
-  const todayTasks = tasks.filter(
-    (task) =>
-      !task.completed &&
-      isToday(task.dueDate) &&
-      task.category.id === newTask.category.id,
-  );
+  const getRelevantDate = (task: Task) => task.startDate ?? task.dueDate;
+  const newTaskDate = getRelevantDate(newTask);
+
+  if (!newTaskDate || !isToday(newTaskDate)) {
+    return { allowed: true };
+  }
+
+  const todayTasks = tasks.filter((task) => {
+    if (task.completed || task.category.id !== newTask.category.id) {
+      return false;
+    }
+
+    const taskDate = getRelevantDate(task);
+    return !!taskDate && isToday(taskDate);
+  });
 
   if (todayTasks.length >= newTask.category.dailyLimit) {
     return {
