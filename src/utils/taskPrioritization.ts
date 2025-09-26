@@ -2,6 +2,7 @@
 // Utilities for scoring, prioritizing, and selecting daily tasks using the Eisenhower Matrix and other rules.
 
 import { Task, TaskScore, EisenhowerQuadrant } from '../types/task';
+import type { CategoryHourLimit, DailyHourLimits } from '../types/user';
 import { isToday, differenceInDays, isPast } from 'date-fns';
 import { normalizeDate, getDateKey, isSameNormalizedDay } from './dateUtils';
 import logger from './logger';
@@ -156,12 +157,64 @@ export function checkCategoryLimits(
 }
 
 // Default category daily hour limits
-export const DEFAULT_CATEGORY_LIMITS: Record<string, { max: number }> = {
-  Work: { max: 10 },
-  Home: { max: 3 },
-  Health: { max: 3 },
-  Personal: { max: 3 },
+export const DEFAULT_CATEGORY_LIMITS: Record<string, CategoryHourLimit> = {
+  Work: { weekdayMax: 10, weekendMax: 2 },
+  Home: { weekdayMax: 3, weekendMax: 4 },
+  Health: { weekdayMax: 3, weekendMax: 2 },
+  Personal: { weekdayMax: 3, weekendMax: 3 },
 };
+
+export const DEFAULT_DAILY_MAX_HOURS: DailyHourLimits = {
+  weekday: 10,
+  weekend: 6,
+};
+
+export function normalizeCategoryLimits(
+  limits: Record<string, Partial<CategoryHourLimit> | { max: number }> = {},
+): Record<string, CategoryHourLimit> {
+  const normalized: Record<string, CategoryHourLimit> = {};
+  const categories = new Set([
+    ...Object.keys(DEFAULT_CATEGORY_LIMITS),
+    ...Object.keys(limits),
+  ]);
+
+  categories.forEach((name) => {
+    const provided = limits[name];
+    const defaultLimit = DEFAULT_CATEGORY_LIMITS[name];
+
+    if (!provided && !defaultLimit) {
+      return;
+    }
+
+    const candidate: Partial<CategoryHourLimit> = {};
+
+    if (provided && typeof provided === 'object') {
+      if ('weekdayMax' in provided || 'weekendMax' in provided) {
+        candidate.weekdayMax = provided.weekdayMax;
+        candidate.weekendMax = provided.weekendMax;
+      } else if ('max' in provided && typeof provided.max === 'number') {
+        candidate.weekdayMax = provided.max;
+        candidate.weekendMax = provided.max;
+      }
+    }
+
+    const weekdayMax =
+      typeof candidate.weekdayMax === 'number'
+        ? candidate.weekdayMax
+        : defaultLimit?.weekdayMax ?? Number.POSITIVE_INFINITY;
+    const weekendMax =
+      typeof candidate.weekendMax === 'number'
+        ? candidate.weekendMax
+        : defaultLimit?.weekendMax ?? weekdayMax;
+
+    normalized[name] = {
+      weekdayMax,
+      weekendMax,
+    };
+  });
+
+  return normalized;
+}
 
 function isWeekend(date: Date) {
   const day = date.getDay();
@@ -202,7 +255,7 @@ function shouldRecurringTaskAppearOnDate(
 export function assignStartDates(
   tasks: Task[],
   maxPerDay: number = 4,
-  categoryLimits: Record<string, { max: number }> = DEFAULT_CATEGORY_LIMITS,
+  categoryLimits: Record<string, CategoryHourLimit> = DEFAULT_CATEGORY_LIMITS,
   baseDate?: Date,
 ): Task[] {
   // First, normalize all dates to startOfDay for consistency
@@ -379,7 +432,12 @@ export function assignStartDates(
         }
 
         const cat = task.category?.name || 'Other';
-        const cap = categoryLimits[cat] || { max: Infinity };
+        const limitSource = categoryLimits[cat] || DEFAULT_CATEGORY_LIMITS[cat];
+        const weekdayCap =
+          limitSource?.weekdayMax ?? Number.POSITIVE_INFINITY;
+        const weekendCap =
+          limitSource?.weekendMax ?? weekdayCap ?? Number.POSITIVE_INFINITY;
+        const applicableCap = isWknd ? weekendCap : weekdayCap;
         const used = categoryHours[cat] || 0;
         const estimatedHours = task.estimatedHours || 1;
         const isDueNow = task.dueDate.getTime() <= normalizedCurrentTime;
@@ -389,7 +447,7 @@ export function assignStartDates(
           continue;
         }
 
-        const withinCategoryLimit = used + estimatedHours <= cap.max;
+        const withinCategoryLimit = used + estimatedHours <= applicableCap;
         if (!withinCategoryLimit && !isDueNow) {
           continue;
         }

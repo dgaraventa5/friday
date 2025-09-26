@@ -12,7 +12,8 @@ describe('default category limits', () => {
     const limits = getDefaultPreferences().categoryLimits;
     categories.forEach((category) => {
       expect(limits).toHaveProperty(category.name);
-      expect(typeof limits[category.name].max).toBe('number');
+      expect(typeof limits[category.name].weekdayMax).toBe('number');
+      expect(typeof limits[category.name].weekendMax).toBe('number');
     });
   });
 });
