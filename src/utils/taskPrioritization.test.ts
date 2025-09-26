@@ -1,4 +1,8 @@
-import { assignStartDates, DEFAULT_CATEGORY_LIMITS } from './taskPrioritization';
+import {
+  assignStartDates,
+  DEFAULT_CATEGORY_LIMITS,
+  checkCategoryLimits,
+} from './taskPrioritization';
 import { Task } from '../types/task';
 import { normalizeDate } from './dateUtils';
 
@@ -208,5 +212,56 @@ describe('assignStartDates due tasks vs future high priority tasks', () => {
     expect(lowAssignment.startDate.getTime()).toBeLessThan(
       highAssignment.startDate.getTime(),
     );
+  });
+});
+
+describe('checkCategoryLimits', () => {
+  const category = {
+    id: 'work',
+    name: 'Work',
+    color: '#000000',
+    dailyLimit: 2,
+    icon: 'briefcase',
+  } as const;
+
+  const createTask = (id: string, date: Date): Task => ({
+    id,
+    name: `Task ${id}`,
+    category,
+    importance: 'important',
+    urgency: 'urgent',
+    dueDate: date,
+    startDate: date,
+    createdAt: date,
+    updatedAt: date,
+    completed: false,
+    estimatedHours: 1,
+  });
+
+  it('blocks additional tasks due today when the category limit is reached', () => {
+    const today = normalizeDate(new Date());
+
+    const tasks: Task[] = [createTask('1', today), createTask('2', today)];
+    const newTask = createTask('3', today);
+
+    const result = checkCategoryLimits(tasks, newTask);
+
+    expect(result.allowed).toBe(false);
+    expect(result.message).toContain("daily limit");
+  });
+
+  it('allows tasks scheduled for future dates even when today has reached the limit', () => {
+    const today = normalizeDate(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const normalizedTomorrow = normalizeDate(tomorrow);
+
+    const tasks: Task[] = [createTask('1', today), createTask('2', today)];
+    const futureTask = createTask('3', normalizedTomorrow);
+
+    const result = checkCategoryLimits(tasks, futureTask);
+
+    expect(result.allowed).toBe(true);
+    expect(result.message).toBeUndefined();
   });
 });
