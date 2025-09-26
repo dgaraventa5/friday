@@ -33,7 +33,11 @@ import {
 import { processRecurringTasks } from '../utils/recurringTaskService';
 import { useAuth } from './AuthContext';
 import { normalizeDate } from '../utils/dateUtils';
-import { DEFAULT_CATEGORY_LIMITS } from '../utils/taskPrioritization';
+import {
+  DEFAULT_CATEGORY_LIMITS,
+  DEFAULT_DAILY_MAX_HOURS,
+  normalizeCategoryLimits,
+} from '../utils/taskPrioritization';
 import logger from '../utils/logger';
 
 // Define the shape of our global state
@@ -80,6 +84,7 @@ const initialState: AppState = {
     theme: 'light',
     notifications: true,
     categoryLimits: DEFAULT_CATEGORY_LIMITS,
+    dailyMaxHours: DEFAULT_DAILY_MAX_HOURS,
   },
   ui: {
     currentPage: 'today',
@@ -164,11 +169,32 @@ function appReducer(state: AppState, action: AppAction): AppState {
           (category) => category.id !== action.payload,
         ),
       };
-    case 'UPDATE_PREFERENCES':
+    case 'UPDATE_PREFERENCES': {
+      const partial = { ...action.payload };
+      let nextCategoryLimits =
+        state.preferences.categoryLimits ||
+        normalizeCategoryLimits(DEFAULT_CATEGORY_LIMITS);
+
+      if (partial.categoryLimits) {
+        nextCategoryLimits = normalizeCategoryLimits(partial.categoryLimits);
+      }
+
+      const mergedDailyMaxHours = {
+        ...DEFAULT_DAILY_MAX_HOURS,
+        ...(state.preferences.dailyMaxHours || {}),
+        ...(partial.dailyMaxHours || {}),
+      };
+
       return {
         ...state,
-        preferences: { ...state.preferences, ...action.payload },
+        preferences: {
+          ...state.preferences,
+          ...partial,
+          categoryLimits: nextCategoryLimits,
+          dailyMaxHours: mergedDailyMaxHours,
+        },
       };
+    }
     case 'SET_CURRENT_PAGE':
       return {
         ...state,
@@ -329,9 +355,12 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
           if (preferences) {
             const mergedPrefs = {
               ...preferences,
-              categoryLimits: {
-                ...DEFAULT_CATEGORY_LIMITS,
-                ...(preferences.categoryLimits || {}),
+              categoryLimits: normalizeCategoryLimits(
+                preferences.categoryLimits,
+              ),
+              dailyMaxHours: {
+                ...DEFAULT_DAILY_MAX_HOURS,
+                ...(preferences.dailyMaxHours || {}),
               },
             };
             dispatch({ type: 'UPDATE_PREFERENCES', payload: mergedPrefs });
@@ -399,15 +428,15 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
             if (loadedPreferences) {
               const mergedPrefs = {
                 ...loadedPreferences,
-                categoryLimits: {
-                  ...DEFAULT_CATEGORY_LIMITS,
-                  ...(loadedPreferences.categoryLimits || {}),
+                categoryLimits: normalizeCategoryLimits(
+                  loadedPreferences.categoryLimits,
+                ),
+                dailyMaxHours: {
+                  ...DEFAULT_DAILY_MAX_HOURS,
+                  ...(loadedPreferences.dailyMaxHours || {}),
                 },
               };
-              dispatch({
-                type: 'UPDATE_PREFERENCES',
-                payload: mergedPrefs,
-              });
+              dispatch({ type: 'UPDATE_PREFERENCES', payload: mergedPrefs });
             }
             if (onboardingComplete && !testMode) {
               dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });

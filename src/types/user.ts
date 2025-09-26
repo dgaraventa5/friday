@@ -1,6 +1,16 @@
 import { User as FirebaseUser } from 'firebase/auth';
 import { Category } from './task';
 
+export interface CategoryHourLimit {
+  weekdayMax: number;
+  weekendMax: number;
+}
+
+export interface DailyHourLimits {
+  weekday: number;
+  weekend: number;
+}
+
 export interface User {
   uid: string;
   email: string | null;
@@ -16,7 +26,8 @@ export interface UserPreferences {
   categories: Category[];
   theme: 'light' | 'dark';
   notifications: boolean;
-  categoryLimits?: Record<string, { max: number }>;
+  categoryLimits?: Record<string, CategoryHourLimit>;
+  dailyMaxHours?: DailyHourLimits;
   defaultView?: string;
   notificationsEnabled?: boolean;
   emailNotifications?: boolean;
