@@ -68,6 +68,13 @@ export function TaskInput({
       return;
     }
 
+    // Determine the appropriate start date based on the selected due date
+    const selectedDueDate = new Date(task.dueDate!);
+    const now = new Date();
+    const isDueToday = selectedDueDate.toDateString() === now.toDateString();
+    const isDueInFuture = selectedDueDate.getTime() > now.getTime() && !isDueToday;
+    const startDate = isDueInFuture ? selectedDueDate : now;
+
     // Create new Task object
     const newTask: Task = {
       id: crypto.randomUUID(),
@@ -89,7 +96,7 @@ export function TaskInput({
           ? task.recurringEndCount
           : undefined,
       recurringCurrentCount: task.isRecurring ? 1 : undefined, // Start at 1 for the first instance
-      startDate: new Date(), // Set startDate to current date instead of undefined
+      startDate,
     };
 
     try {

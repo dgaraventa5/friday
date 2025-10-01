@@ -131,6 +131,22 @@ export function checkCategoryLimits(
   newTask: Task,
 ): { allowed: boolean; message?: string } {
   const getRelevantDate = (task: Task) => task.startDate ?? task.dueDate;
+  const isFutureDueDate = (date?: Date | null) => {
+    if (!date) {
+      return false;
+    }
+
+    if (isToday(date)) {
+      return false;
+    }
+
+    return !isPast(date);
+  };
+
+  if (isFutureDueDate(newTask.dueDate)) {
+    return { allowed: true };
+  }
+
   const newTaskDate = getRelevantDate(newTask);
 
   if (!newTaskDate || !isToday(newTaskDate)) {
@@ -139,6 +155,10 @@ export function checkCategoryLimits(
 
   const todayTasks = tasks.filter((task) => {
     if (task.completed || task.category.id !== newTask.category.id) {
+      return false;
+    }
+
+    if (isFutureDueDate(task.dueDate)) {
       return false;
     }
 
