@@ -264,4 +264,26 @@ describe('checkCategoryLimits', () => {
     expect(result.allowed).toBe(true);
     expect(result.message).toBeUndefined();
   });
+
+  it('allows future due dates even when the start date is today', () => {
+    const today = normalizeDate(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const normalizedTomorrow = normalizeDate(tomorrow);
+
+    const tasks: Task[] = [createTask('1', today), createTask('2', today)];
+    const futureTaskWithTodayStart: Task = {
+      ...createTask('3', today),
+      dueDate: normalizedTomorrow,
+    };
+
+    const result = checkCategoryLimits(tasks, futureTaskWithTodayStart);
+
+    expect(result.allowed).toBe(true);
+    expect(result.message).toBeUndefined();
+    expect(futureTaskWithTodayStart.startDate?.getTime()).toBe(today.getTime());
+    expect(futureTaskWithTodayStart.dueDate.getTime()).toBe(
+      normalizedTomorrow.getTime(),
+    );
+  });
 });
