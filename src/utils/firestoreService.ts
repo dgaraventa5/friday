@@ -22,6 +22,7 @@ import logger from './logger';
 import { Task } from '../types/task';
 import { Category } from '../types/task';
 import { UserPreferences } from '../types/user';
+import { convertTimestamps, prepareForFirestore } from './firestoreTransforms';
 import {
   saveTasks,
   loadTasks,
@@ -143,50 +144,6 @@ export const COLLECTIONS = {
   TASKS: 'tasks',
   CATEGORIES: 'categories',
   PREFERENCES: 'preferences',
-};
-
-// Helper to convert Firestore timestamp to Date
-const convertTimestamps = <T extends DocumentData>(obj: T): T => {
-  if (!obj) return obj;
-
-  // Use type assertion to avoid 'any' type
-  const result: DocumentData = { ...obj };
-
-  // Convert Timestamp objects to Date objects
-  Object.keys(result).forEach((key) => {
-    if (result[key] instanceof Timestamp) {
-      result[key] = result[key].toDate();
-    } else if (result[key] && typeof result[key] === 'object') {
-      result[key] = convertTimestamps(result[key] as DocumentData);
-    }
-  });
-
-  return result as T;
-};
-
-// Helper to prepare data for Firestore (handle Date objects)
-const prepareForFirestore = <T>(obj: T): DocumentData => {
-  if (!obj) return obj as unknown as DocumentData;
-
-  const result = { ...obj } as DocumentData;
-
-  // Convert Date objects to Firestore Timestamps
-  Object.keys(result).forEach((key) => {
-    // Handle undefined values - remove them to prevent Firestore errors
-    if (result[key] === undefined) {
-      delete result[key];
-    } else if (result[key] instanceof Date) {
-      result[key] = Timestamp.fromDate(result[key] as Date);
-    } else if (
-      result[key] &&
-      typeof result[key] === 'object' &&
-      !(result[key] instanceof Timestamp)
-    ) {
-      result[key] = prepareForFirestore(result[key]);
-    }
-  });
-
-  return result;
 };
 
 // Save tasks to Firestore
@@ -788,7 +745,7 @@ export async function migrateLocalStorageToFirestore(
 }
 
 // Export db and helper functions for use in other components
-export { db, convertTimestamps };
+export { db, convertTimestamps, prepareForFirestore };
 
 // Migrate tasks from localStorage to Firestore
 export async function migrateTasksToFirestore(userId: string): Promise<void> {
