@@ -78,6 +78,30 @@ export function formatDateInput(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
 
+export function parseLocalDateInput(value: string): Date {
+  if (!value) {
+    return new Date(NaN);
+  }
+
+  const [yearStr, monthStr, dayStr] = value.split('-');
+  const year = Number(yearStr);
+  const monthIndex = Number(monthStr) - 1;
+  const day = Number(dayStr);
+
+  if (
+    Number.isNaN(year) ||
+    Number.isNaN(monthIndex) ||
+    Number.isNaN(day) ||
+    monthIndex < 0 ||
+    monthIndex > 11 ||
+    day < 1
+  ) {
+    return new Date(NaN);
+  }
+
+  return new Date(year, monthIndex, day);
+}
+
 // Standard function to get a normalized date key in YYYY-MM-DD format
 export function getDateKey(date: Date): string {
   return startOfDay(new Date(date)).toLocaleDateString('en-CA');

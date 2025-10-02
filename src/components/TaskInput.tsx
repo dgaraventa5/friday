@@ -7,7 +7,7 @@ import { Button } from './Button';
 import { Task, Category, AddTaskResult } from '../types/task';
 import { FormField } from './FormField';
 import { validateTask, ValidationError } from '../utils/validation';
-import { normalizeRecurringDays } from '../utils/dateUtils';
+import { formatDateInput, parseLocalDateInput } from '../utils/dateUtils';
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -242,9 +242,9 @@ export function TaskInput({
               <FormField
                 label="Due Date"
                 type="date"
-                value={task.dueDate?.toISOString().split('T')[0]}
+                value={task.dueDate ? formatDateInput(new Date(task.dueDate)) : ''}
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  handleChange('dueDate', new Date(e.target.value))
+                  handleChange('dueDate', parseLocalDateInput(e.target.value))
                 }
                 required
                 error={errors.find((e) => e.field === 'dueDate')?.message}

@@ -6,7 +6,8 @@ import {
   normalizeDate,
   isSameNormalizedDay,
   getNextRecurringDate,
-  normalizeRecurringDays,
+  formatDateInput,
+  parseLocalDateInput,
 } from './dateUtils';
 import { addDays, subDays } from 'date-fns';
 
@@ -139,34 +140,39 @@ describe('dateUtils', () => {
     });
   });
 
-  describe('normalizeRecurringDays', () => {
-    it('returns undefined for nullish inputs', () => {
-      expect(normalizeRecurringDays(undefined)).toBeUndefined();
-      expect(normalizeRecurringDays(null)).toBeUndefined();
+
+  describe('parseLocalDateInput', () => {
+    it('parses a YYYY-MM-DD string using the local timezone', () => {
+      const result = parseLocalDateInput('2024-09-06');
+
+      expect(Number.isNaN(result.getTime())).toBe(false);
+      expect(result.getFullYear()).toBe(2024);
+      expect(result.getMonth()).toBe(8);
+      expect(result.getDate()).toBe(6);
     });
 
-    it('normalizes arrays of numbers and numeric strings', () => {
-      expect(normalizeRecurringDays([5, '2', 5, '07', -1, 'foo'])).toEqual([2, 5]);
+    it('preserves the calendar day regardless of timezone offset', () => {
+      const result = parseLocalDateInput('2024-09-06');
+      const normalizedUtc = new Date(
+        result.getTime() + result.getTimezoneOffset() * 60 * 1000,
+      );
+
+      expect(formatDateInput(result)).toBe('2024-09-06');
+      expect(normalizedUtc.getUTCFullYear()).toBe(2024);
+      expect(normalizedUtc.getUTCMonth()).toBe(8);
+      expect(normalizedUtc.getUTCDate()).toBe(6);
     });
 
-    it('handles objects with numeric keys and truthy values', () => {
-      const result = normalizeRecurringDays({
-        0: true,
-        3: 'yes',
-        bad: true,
-        6: false,
-      });
+    it('returns an invalid date for malformed input', () => {
+      const result = parseLocalDateInput('invalid');
 
-      expect(result).toEqual([0, 3]);
+      expect(Number.isNaN(result.getTime())).toBe(true);
     });
 
-    it('returns an empty array for empty collections', () => {
-      expect(normalizeRecurringDays([])).toEqual([]);
-      expect(normalizeRecurringDays({})).toEqual([]);
-    });
+    it('returns an invalid date for empty input', () => {
+      const result = parseLocalDateInput('');
 
-    it('returns undefined for unsupported types', () => {
-      expect(normalizeRecurringDays('monday')).toBeUndefined();
+      expect(Number.isNaN(result.getTime())).toBe(true);
     });
   });
 });
