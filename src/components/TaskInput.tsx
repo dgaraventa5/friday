@@ -7,6 +7,7 @@ import { Button } from './Button';
 import { Task, Category, AddTaskResult } from '../types/task';
 import { FormField } from './FormField';
 import { validateTask, ValidationError } from '../utils/validation';
+import { normalizeRecurringDays } from '../utils/dateUtils';
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -37,6 +38,7 @@ export function TaskInput({
     recurringEndType: 'never',
     recurringEndCount: 1,
     recurringCurrentCount: 0,
+    recurringDays: [],
   });
 
   // Validation errors
@@ -75,6 +77,8 @@ export function TaskInput({
     const isDueInFuture = selectedDueDate.getTime() > now.getTime() && !isDueToday;
     const startDate = isDueInFuture ? selectedDueDate : now;
 
+    const recurringDays = normalizeRecurringDays(task.recurringDays);
+
     // Create new Task object
     const newTask: Task = {
       id: crypto.randomUUID(),
@@ -89,7 +93,7 @@ export function TaskInput({
       updatedAt: new Date(),
       isRecurring: task.isRecurring || false,
       recurringInterval: task.recurringInterval,
-      recurringDays: task.recurringDays,
+      recurringDays: task.isRecurring ? recurringDays : undefined,
       recurringEndType: task.isRecurring ? task.recurringEndType : undefined,
       recurringEndCount:
         task.isRecurring && task.recurringEndType === 'after'
@@ -118,6 +122,7 @@ export function TaskInput({
         recurringEndType: 'never',
         recurringEndCount: 1,
         recurringCurrentCount: 0,
+        recurringDays: [],
       });
       setErrors([]);
       setSubmitError(null);
@@ -143,6 +148,7 @@ export function TaskInput({
       recurringEndType: 'never',
       recurringEndCount: 1,
       recurringCurrentCount: 0,
+      recurringDays: [],
     });
     setSubmitError(null);
     setShowRecurrence(false);
@@ -405,15 +411,22 @@ export function TaskInput({
                             >
                               <input
                                 type="checkbox"
-                                checked={task.recurringDays?.includes(index)}
+                                checked={
+                                  Array.isArray(task.recurringDays) &&
+                                  task.recurringDays.includes(index)
+                                }
                                 onChange={(
                                   e: ChangeEvent<HTMLInputElement>,
                                 ) => {
-                                  const days = task.recurringDays || [];
-                                  const newDays = e.target.checked
+                                  const days = Array.isArray(task.recurringDays)
+                                    ? task.recurringDays
+                                    : [];
+                                  const updated = e.target.checked
                                     ? [...days, index]
                                     : days.filter((d) => d !== index);
-                                  handleChange('recurringDays', newDays);
+                                  const normalized =
+                                    normalizeRecurringDays(updated) ?? [];
+                                  handleChange('recurringDays', normalized);
                                 }}
                                 className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
                               />

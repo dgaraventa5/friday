@@ -1,6 +1,10 @@
 import { Task, Category } from '../types/task';
 import { UserPreferences } from '../types/user';
-import { normalizeDate, getDateKey } from './dateUtils';
+import {
+  normalizeDate,
+  getDateKey,
+  normalizeRecurringDays,
+} from './dateUtils';
 import logger from './logger';
 import {
   DEFAULT_CATEGORY_LIMITS,
@@ -63,6 +67,7 @@ export function loadTasks(prefix: string = ''): Task[] {
       completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
       nextDueDate: task.nextDueDate ? new Date(task.nextDueDate) : undefined,
       startDate: normalizeDate(task.startDate),
+      recurringDays: normalizeRecurringDays(task.recurringDays),
     }));
   } catch {
     return [];

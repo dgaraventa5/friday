@@ -10,6 +10,62 @@ import {
   getDay,
 } from 'date-fns';
 
+const DAY_OF_WEEK_MIN = 0;
+const DAY_OF_WEEK_MAX = 6;
+
+const parseRecurringDay = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  return null;
+};
+
+export function normalizeRecurringDays(
+  input: unknown,
+): number[] | undefined {
+  if (input === null || input === undefined) {
+    return undefined;
+  }
+
+  const values: number[] = [];
+
+  if (Array.isArray(input)) {
+    input.forEach((item) => {
+      const parsed = parseRecurringDay(item);
+      if (parsed !== null) {
+        values.push(parsed);
+      }
+    });
+  } else if (typeof input === 'object') {
+    Object.entries(input as Record<string, unknown>).forEach(
+      ([key, value]) => {
+        if (!value) return;
+        const parsed = parseRecurringDay(key);
+        if (parsed !== null) {
+          values.push(parsed);
+        }
+      },
+    );
+  } else {
+    return undefined;
+  }
+
+  const normalized = Array.from(new Set(values))
+    .filter(
+      (day) =>
+        Number.isInteger(day) && day >= DAY_OF_WEEK_MIN && day <= DAY_OF_WEEK_MAX,
+    )
+    .sort((a, b) => a - b);
+
+  return normalized;
+}
+
 export function formatTaskDate(date: Date): string {
   if (isToday(date)) return 'Today';
   if (isTomorrow(date)) return 'Tomorrow';

@@ -23,6 +23,7 @@ import { Task } from '../types/task';
 import { Category } from '../types/task';
 import { UserPreferences } from '../types/user';
 import { convertTimestamps, prepareForFirestore } from './firestoreTransforms';
+import { normalizeRecurringDays } from './dateUtils';
 import {
   saveTasks,
   loadTasks,
@@ -241,7 +242,12 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
           // Only add the task if we haven't seen this ID before
           if (!taskIds.has(taskWithoutUserId.id)) {
             taskIds.add(taskWithoutUserId.id);
-            tasks.push(taskWithoutUserId as Task);
+            tasks.push({
+              ...(taskWithoutUserId as Task),
+              recurringDays: normalizeRecurringDays(
+                (taskWithoutUserId as Task).recurringDays,
+              ),
+            });
           } else {
             logger.warn(
               `[Firestore] Duplicate task ID detected: ${taskWithoutUserId.id}, skipping`,

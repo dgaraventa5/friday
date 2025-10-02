@@ -6,6 +6,7 @@ import {
   normalizeDate,
   isSameNormalizedDay,
   getNextRecurringDate,
+  normalizeRecurringDays,
 } from './dateUtils';
 import { addDays, subDays } from 'date-fns';
 
@@ -135,6 +136,37 @@ describe('dateUtils', () => {
       expect(next.getDate()).toBe(15);
       expect(next.getMonth()).toBe(1); // February
       expect(next.getFullYear()).toBe(2023);
+    });
+  });
+
+  describe('normalizeRecurringDays', () => {
+    it('returns undefined for nullish inputs', () => {
+      expect(normalizeRecurringDays(undefined)).toBeUndefined();
+      expect(normalizeRecurringDays(null)).toBeUndefined();
+    });
+
+    it('normalizes arrays of numbers and numeric strings', () => {
+      expect(normalizeRecurringDays([5, '2', 5, '07', -1, 'foo'])).toEqual([2, 5]);
+    });
+
+    it('handles objects with numeric keys and truthy values', () => {
+      const result = normalizeRecurringDays({
+        0: true,
+        3: 'yes',
+        bad: true,
+        6: false,
+      });
+
+      expect(result).toEqual([0, 3]);
+    });
+
+    it('returns an empty array for empty collections', () => {
+      expect(normalizeRecurringDays([])).toEqual([]);
+      expect(normalizeRecurringDays({})).toEqual([]);
+    });
+
+    it('returns undefined for unsupported types', () => {
+      expect(normalizeRecurringDays('monday')).toBeUndefined();
     });
   });
 });

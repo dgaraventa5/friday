@@ -7,6 +7,7 @@ import { Button } from './Button';
 import { Task, Category } from '../types/task';
 import { FormField } from './FormField';
 import { validateTask, ValidationError } from '../utils/validation';
+import { normalizeRecurringDays } from '../utils/dateUtils';
 
 interface EditTaskModalProps {
   task: Task;
@@ -24,7 +25,10 @@ export function EditTaskModal({
   onDelete,
 }: EditTaskModalProps) {
   // Local state for task fields, initialized with the existing task
-  const [editedTask, setEditedTask] = useState<Task>({ ...task });
+  const [editedTask, setEditedTask] = useState<Task>(() => ({
+    ...task,
+    recurringDays: normalizeRecurringDays(task.recurringDays),
+  }));
 
   // Validation errors
   const [errors, setErrors] = useState<ValidationError[]>([]);
@@ -49,9 +53,12 @@ export function EditTaskModal({
       return;
     }
 
+    const recurringDays = normalizeRecurringDays(editedTask.recurringDays);
+
     // Update the task with current timestamp
     const updatedTask: Task = {
       ...editedTask,
+      recurringDays: editedTask.isRecurring ? recurringDays : undefined,
       updatedAt: new Date(),
     };
 
@@ -235,13 +242,20 @@ export function EditTaskModal({
                       <label key={day} className="inline-flex items-center">
                         <input
                           type="checkbox"
-                          checked={editedTask.recurringDays?.includes(index)}
+                          checked={
+                            Array.isArray(editedTask.recurringDays) &&
+                            editedTask.recurringDays.includes(index)
+                          }
                           onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                            const days = editedTask.recurringDays || [];
-                            const newDays = e.target.checked
+                            const days = Array.isArray(editedTask.recurringDays)
+                              ? editedTask.recurringDays
+                              : [];
+                            const updated = e.target.checked
                               ? [...days, index]
                               : days.filter((d) => d !== index);
-                            handleChange('recurringDays', newDays);
+                            const normalized =
+                              normalizeRecurringDays(updated) ?? [];
+                            handleChange('recurringDays', normalized);
                           }}
                           className="h-4 w-4 sm:h-3 sm:w-3 text-primary-600 focus:ring-primary-500 border-neutral-50 rounded"
                         />
