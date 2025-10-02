@@ -6,6 +6,8 @@ import {
   normalizeDate,
   isSameNormalizedDay,
   getNextRecurringDate,
+  formatDateInput,
+  parseLocalDateInput,
 } from './dateUtils';
 import { addDays, subDays } from 'date-fns';
 
@@ -135,6 +137,41 @@ describe('dateUtils', () => {
       expect(next.getDate()).toBe(15);
       expect(next.getMonth()).toBe(1); // February
       expect(next.getFullYear()).toBe(2023);
+    });
+  });
+
+  describe('parseLocalDateInput', () => {
+    it('parses a YYYY-MM-DD string using the local timezone', () => {
+      const result = parseLocalDateInput('2024-09-06');
+
+      expect(Number.isNaN(result.getTime())).toBe(false);
+      expect(result.getFullYear()).toBe(2024);
+      expect(result.getMonth()).toBe(8);
+      expect(result.getDate()).toBe(6);
+    });
+
+    it('preserves the calendar day regardless of timezone offset', () => {
+      const result = parseLocalDateInput('2024-09-06');
+      const normalizedUtc = new Date(
+        result.getTime() + result.getTimezoneOffset() * 60 * 1000,
+      );
+
+      expect(formatDateInput(result)).toBe('2024-09-06');
+      expect(normalizedUtc.getUTCFullYear()).toBe(2024);
+      expect(normalizedUtc.getUTCMonth()).toBe(8);
+      expect(normalizedUtc.getUTCDate()).toBe(6);
+    });
+
+    it('returns an invalid date for malformed input', () => {
+      const result = parseLocalDateInput('invalid');
+
+      expect(Number.isNaN(result.getTime())).toBe(true);
+    });
+
+    it('returns an invalid date for empty input', () => {
+      const result = parseLocalDateInput('');
+
+      expect(Number.isNaN(result.getTime())).toBe(true);
     });
   });
 });

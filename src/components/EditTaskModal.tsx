@@ -7,6 +7,7 @@ import { Button } from './Button';
 import { Task, Category } from '../types/task';
 import { FormField } from './FormField';
 import { validateTask, ValidationError } from '../utils/validation';
+import { formatDateInput, parseLocalDateInput } from '../utils/dateUtils';
 
 interface EditTaskModalProps {
   task: Task;
@@ -127,9 +128,9 @@ export function EditTaskModal({
           <FormField
             label="Due Date"
             type="date"
-            value={new Date(editedTask.dueDate).toLocaleDateString('en-CA')}
+            value={formatDateInput(new Date(editedTask.dueDate))}
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              handleChange('dueDate', new Date(e.target.value))
+              handleChange('dueDate', parseLocalDateInput(e.target.value))
             }
             required
             error={errors.find((e) => e.field === 'dueDate')?.message}
