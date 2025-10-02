@@ -7,7 +7,11 @@ import { Button } from './Button';
 import { Task, Category, AddTaskResult } from '../types/task';
 import { FormField } from './FormField';
 import { validateTask, ValidationError } from '../utils/validation';
-import { formatDateInput, parseLocalDateInput } from '../utils/dateUtils';
+import {
+  formatDateInput,
+  parseLocalDateInput,
+  normalizeRecurringDays,
+} from '../utils/dateUtils';
 
 type MaybePromise<T> = T | Promise<T>;
 
