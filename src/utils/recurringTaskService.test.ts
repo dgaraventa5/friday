@@ -1,6 +1,13 @@
-import { generateNextRecurringTask, handleRecurringTaskCompletion, hasReachedEndOfRecurrence } from './recurringTaskService';
+import {
+  generateNextRecurringTask,
+  handleRecurringTaskCompletion,
+  hasReachedEndOfRecurrence,
+  processRecurringTasks,
+} from './recurringTaskService';
 import { Task, Category } from '../types/task';
 import { addDays, addMonths } from 'date-fns';
+import { SCHEDULE_LOOKAHEAD_DAYS } from './scheduleConfig';
+import { normalizeDate, getDateKey } from './dateUtils';
 
 // Mock category for testing
 const mockCategory: Category = {
@@ -8,7 +15,7 @@ const mockCategory: Category = {
   name: 'Work',
   color: '#3b82f6',
   dailyLimit: 2,
-  icon: 'briefcase'
+  icon: 'briefcase',
 };
 
 // Helper to create a task for testing
@@ -176,10 +183,52 @@ describe('Recurring Task Service', () => {
         recurringEndCount: 3,
         recurringCurrentCount: 3
       });
-      
+
       const result = handleRecurringTaskCompletion(task);
-      
+
       expect(result).toBeNull();
     });
   });
-}); 
+
+  describe('processRecurringTasks', () => {
+    it('generates weekly recurrences across the full schedule horizon without duplicates', () => {
+      const baseDate = normalizeDate(new Date('2025-01-06')); // Monday
+      const weeklyTask = createMockTask({
+        id: 'weekly-task-id',
+        name: 'Weekly Planning',
+        recurringInterval: 'weekly',
+        recurringDays: [baseDate.getDay()],
+        dueDate: baseDate,
+        startDate: baseDate,
+        recurringEndType: 'never',
+        recurringCurrentCount: undefined,
+      });
+
+      const processed = processRecurringTasks([weeklyTask], {
+        referenceDate: baseDate,
+      });
+
+      const occurrences = processed.filter((task) => task.name === 'Weekly Planning');
+      expect(occurrences.length).toBeGreaterThan(3);
+
+      const threeWeeksOut = normalizeDate(addDays(baseDate, 21));
+      const hasThirdWeek = occurrences.some(
+        (task) => getDateKey(task.dueDate) === getDateKey(threeWeeksOut),
+      );
+      expect(hasThirdWeek).toBe(true);
+
+      // Running the processor again should not create duplicates within the horizon
+      const reprocessed = processRecurringTasks(processed, {
+        referenceDate: baseDate,
+        lookAheadDays: SCHEDULE_LOOKAHEAD_DAYS,
+      });
+
+      const occurrenceKeys = reprocessed
+        .filter((task) => task.name === 'Weekly Planning')
+        .map((task) => `${task.name}_${getDateKey(task.dueDate)}`);
+
+      const uniqueKeys = new Set(occurrenceKeys);
+      expect(uniqueKeys.size).toBe(occurrenceKeys.length);
+    });
+  });
+});

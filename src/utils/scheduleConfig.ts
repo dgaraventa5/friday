@@ -1,0 +1,1 @@
+export const SCHEDULE_LOOKAHEAD_DAYS = 42;
