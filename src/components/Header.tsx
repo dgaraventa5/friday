@@ -1,7 +1,7 @@
 // Header.tsx
 // App header: shows app name, date, progress circle for Today's Focus, and settings button.
 
-import { Flame, Settings, User } from 'lucide-react';
+import { Flame, User } from 'lucide-react';
 import { ProgressCircle } from './ProgressCircle';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -108,25 +108,13 @@ export function Header({
               />
             </div>
 
-            {/* Settings button */}
-            <div className="relative">
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors duration-200"
-                title="Settings"
-                style={{ width: iconSize, height: iconSize }}
-              >
-                <Settings className="w-6 h-6" />
-              </button>
-              {showSettings && (
-                <CategoryLimitMenu onClose={() => setShowSettings(false)} />
-              )}
-            </div>
-
             {/* User profile button */}
             <div className="relative">
               <button
-                onClick={() => setShowUserProfile(!showUserProfile)}
+                onClick={() => {
+                  setShowUserProfile(!showUserProfile);
+                  setShowSettings(false);
+                }}
                 className={`flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors duration-200`}
                 title="User Profile"
                 style={{ width: iconSize, height: iconSize }}
@@ -160,8 +148,17 @@ export function Header({
               {/* User profile dropdown */}
               {showUserProfile && (
                 <div className="absolute right-0 mt-2 z-10 w-64">
-                  <UserProfile />
+                  <UserProfile
+                    onOpenSettings={() => {
+                      setShowSettings(true);
+                      setShowUserProfile(false);
+                    }}
+                  />
                 </div>
+              )}
+
+              {showSettings && (
+                <CategoryLimitMenu onClose={() => setShowSettings(false)} />
               )}
             </div>
           </div>
