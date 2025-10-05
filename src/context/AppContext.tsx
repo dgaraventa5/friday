@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { Task, Category } from '../types/task';
 import { UserPreferences } from '../types/user';
+import { StreakState } from '../types/streak';
 import {
   loadTasks,
   loadCategories,
@@ -39,6 +40,13 @@ import {
   normalizeCategoryLimits,
 } from '../utils/taskPrioritization';
 import logger from '../utils/logger';
+import {
+  DEFAULT_STREAK_STATE,
+  loadStreakState,
+  registerCompletion,
+  clearStreakCelebration,
+  saveStreakState,
+} from '../utils/streakUtils';
 
 // Define the shape of our global state
 interface AppState {
@@ -51,6 +59,7 @@ interface AppState {
     error: string | null;
   };
   onboarding_complete: boolean;
+  streak: StreakState;
 }
 
 // Define the actions that can modify our state
@@ -72,7 +81,10 @@ type AppAction =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_ONBOARDING_COMPLETE'; payload: boolean }
   | { type: 'PROCESS_RECURRING_TASKS' }
-  | { type: 'NORMALIZE_ALL_DATES' };
+  | { type: 'NORMALIZE_ALL_DATES' }
+  | { type: 'SET_STREAK'; payload: StreakState }
+  | { type: 'REGISTER_TASK_COMPLETION'; payload: { date: Date } }
+  | { type: 'DISMISS_STREAK_CELEBRATION' };
 
 // Initial state for the app
 const initialState: AppState = {
@@ -92,6 +104,7 @@ const initialState: AppState = {
     error: null,
   },
   onboarding_complete: false,
+  streak: { ...DEFAULT_STREAK_STATE },
 };
 
 // Create the context
@@ -215,6 +228,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
         `[AppContext] Setting onboarding_complete to: ${action.payload}`,
       );
       return { ...state, onboarding_complete: action.payload };
+    case 'SET_STREAK':
+      return { ...state, streak: action.payload };
+    case 'REGISTER_TASK_COMPLETION':
+      return {
+        ...state,
+        streak: registerCompletion(state.streak, action.payload.date),
+      };
+    case 'DISMISS_STREAK_CELEBRATION':
+      return { ...state, streak: clearStreakCelebration(state.streak) };
     case 'PROCESS_RECURRING_TASKS': {
       const processedTasks = processRecurringTasks(state.tasks);
       return { ...state, tasks: processedTasks };
@@ -303,6 +325,9 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
             `[AppContext] Loaded ${tasks.length} tasks, ${categories.length} categories from Firestore`,
           );
 
+          const storedStreak = loadStreakState(userPrefix);
+          dispatch({ type: 'SET_STREAK', payload: storedStreak });
+
           if (tasks.length > 0) {
             dispatch({ type: 'SET_TASKS', payload: tasks });
           }
@@ -376,6 +401,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
           if (tasks.length === 0 && categories.length === 0) {
             const localTasks = loadTasks(userPrefix);
             const localCategories = loadCategories(userPrefix);
+            const localStreak = loadStreakState(userPrefix);
 
             if (localTasks.length > 0 || localCategories.length > 0) {
               logger.log('[AppContext] Migrating local data to Firestore');
@@ -394,6 +420,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
               if (localCategories.length > 0) {
                 dispatch({ type: 'SET_CATEGORIES', payload: localCategories });
               }
+              dispatch({ type: 'SET_STREAK', payload: localStreak });
             }
           }
 
@@ -411,6 +438,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
             const loadedTasks = loadTasks(userPrefix);
             const loadedCategories = loadCategories(userPrefix);
             const loadedPreferences = loadPreferences(userPrefix);
+            const loadedStreak = loadStreakState(userPrefix);
             const onboardingComplete =
               localStorage.getItem(`${userPrefix}onboarding_complete`) ===
               'true';
@@ -438,6 +466,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
               };
               dispatch({ type: 'UPDATE_PREFERENCES', payload: mergedPrefs });
             }
+            dispatch({ type: 'SET_STREAK', payload: loadedStreak });
             if (onboardingComplete && !testMode) {
               dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
             } else if (testMode) {
@@ -455,6 +484,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_TASKS', payload: [] });
       dispatch({ type: 'SET_CATEGORIES', payload: [] });
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: false });
+      dispatch({ type: 'SET_STREAK', payload: { ...DEFAULT_STREAK_STATE } });
       setIsDataLoaded(true);
     }
   }, [userId, testMode, dispatch]);
@@ -528,6 +558,13 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
       );
     }
   }, [state.onboarding_complete, userId, testMode, isDataLoaded]);
+
+  useEffect(() => {
+    if (userId && isDataLoaded) {
+      const userPrefix = `user_${userId}_`;
+      saveStreakState(state.streak, userPrefix);
+    }
+  }, [state.streak, userId, isDataLoaded]);
 
   return (
     <AppContext.Provider value={{ state, dispatch, testMode, toggleTestMode }}>

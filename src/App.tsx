@@ -4,6 +4,7 @@
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
+import { DailyStreakCard } from './components/DailyStreakCard';
 import { TaskList } from './components/TaskList';
 import { TaskInput } from './components/TaskInput';
 import { WelcomeMessage } from './components/WelcomeMessage';
@@ -33,7 +34,7 @@ import { getTodayKey, getDateKey } from './utils/dateUtils';
 function AppContent() {
   // Get global state and dispatch from context
   const { state, dispatch } = useApp();
-  const { tasks, categories, ui, onboarding_complete } = state;
+  const { tasks, categories, ui, onboarding_complete, streak } = state;
   const [isTaskInputExpanded, setIsTaskInputExpanded] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const todayKey = getTodayKey();
@@ -160,7 +161,13 @@ function AppContent() {
       }
     }
 
+    const isCompletingTask = task ? !task.completed : false;
+
     dispatch({ type: 'TOGGLE_TASK_COMPLETE', payload: taskId });
+
+    if (isCompletingTask) {
+      dispatch({ type: 'REGISTER_TASK_COMPLETION', payload: { date: new Date() } });
+    }
   };
 
   // Add a new task and handle onboarding flag
@@ -335,6 +342,14 @@ function AppContent() {
             {/* Show welcome message if onboarding not complete AND no tasks exist */}
             <ErrorBoundary>
               {!onboarding_complete && tasks.length === 0 && <WelcomeMessage />}
+            </ErrorBoundary>
+            <ErrorBoundary>
+              <DailyStreakCard
+                streak={streak}
+                onDismissCelebration={() =>
+                  dispatch({ type: 'DISMISS_STREAK_CELEBRATION' })
+                }
+              />
             </ErrorBoundary>
             {/* Main task list (today's focus or full schedule) */}
             <ErrorBoundary>
