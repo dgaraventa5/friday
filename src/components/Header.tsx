@@ -1,7 +1,7 @@
 // Header.tsx
 // App header: shows app name, date, progress circle for Today's Focus, and settings button.
 
-import { User, Settings } from 'lucide-react';
+import { Flame, Settings, User } from 'lucide-react';
 import { ProgressCircle } from './ProgressCircle';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -12,11 +12,13 @@ interface HeaderProps {
   todayTaskCount: number;
   totalTaskCount: number;
   todayTasksCompleted: number;
+  streakCount: number;
 }
 
 export function Header({
   todayTaskCount,
   todayTasksCompleted,
+  streakCount,
 }: HeaderProps) {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -88,6 +90,15 @@ export function Header({
 
           {/* Progress circle and user profile */}
           <div className="flex items-center gap-4">
+            {/* Daily streak indicator */}
+            <div
+              className="flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700"
+              aria-label={`Daily streak: ${streakCount} day${streakCount === 1 ? '' : 's'}`}
+            >
+              <Flame className="h-4 w-4" aria-hidden />
+              <span>{streakCount}</span>
+            </div>
+
             {/* Progress Circle */}
             <div className="flex items-center">
               <ProgressCircle

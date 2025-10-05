@@ -1,14 +1,13 @@
 import { addDays } from 'date-fns';
 import { registerCompletion, DEFAULT_STREAK_STATE } from './streakUtils';
 import { parseLocalDateInput } from './dateUtils';
-import { StreakState } from '../types/streak';
 
 describe('registerCompletion', () => {
   const baseDate = parseLocalDateInput('2025-01-01');
 
   it('starts a new streak on first completion', () => {
     const updated = registerCompletion(
-      { ...DEFAULT_STREAK_STATE, freezeTokens: 0 },
+      { ...DEFAULT_STREAK_STATE },
       addDays(baseDate, 0),
     );
 
@@ -18,7 +17,7 @@ describe('registerCompletion', () => {
   });
 
   it('increments streak on consecutive day completions', () => {
-    let state: StreakState = { ...DEFAULT_STREAK_STATE, freezeTokens: 0 };
+    let state = { ...DEFAULT_STREAK_STATE };
     state = registerCompletion(state, addDays(baseDate, 0));
     state = registerCompletion(state, addDays(baseDate, 1));
 
@@ -27,34 +26,24 @@ describe('registerCompletion', () => {
   });
 
   it('resets streak when a day is missed without tokens', () => {
-    let state: StreakState = { ...DEFAULT_STREAK_STATE, freezeTokens: 0 };
+    let state = { ...DEFAULT_STREAK_STATE };
     state = registerCompletion(state, addDays(baseDate, 0));
     state = registerCompletion(state, addDays(baseDate, 1));
     state = registerCompletion(state, addDays(baseDate, 3));
 
     expect(state.currentStreak).toBe(1);
-    expect(state.freezeTokens).toBe(0);
+    expect(state.longestStreak).toBe(2);
   });
 
-  it('consumes a freeze token to preserve streak after a missed day', () => {
-    let state: StreakState = { ...DEFAULT_STREAK_STATE, freezeTokens: 1 };
-    state = registerCompletion(state, addDays(baseDate, 0));
-    state = registerCompletion(state, addDays(baseDate, 2));
+  it('triggers milestone celebrations at configured streak lengths', () => {
+    let state = { ...DEFAULT_STREAK_STATE };
 
-    expect(state.currentStreak).toBe(2);
-    expect(state.freezeTokens).toBe(0);
-    expect(state.freezeUsedOn).toBe('2025-01-03');
-  });
-
-  it('awards a freeze token every 7-day milestone', () => {
-    let state: StreakState = { ...DEFAULT_STREAK_STATE, freezeTokens: 0 };
-
-    for (let i = 0; i < 7; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       state = registerCompletion(state, addDays(baseDate, i));
     }
 
-    expect(state.currentStreak).toBe(7);
-    expect(state.freezeTokens).toBe(1);
-    expect(state.longestStreak).toBe(7);
+    expect(state.currentStreak).toBe(3);
+    expect(state.milestoneCelebration?.streak).toBe(3);
+    expect(state.longestStreak).toBe(3);
   });
 });
