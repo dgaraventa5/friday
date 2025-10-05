@@ -343,14 +343,6 @@ function AppContent() {
             <ErrorBoundary>
               {!onboarding_complete && tasks.length === 0 && <WelcomeMessage />}
             </ErrorBoundary>
-            <ErrorBoundary>
-              <DailyStreakCard
-                streak={streak}
-                onDismissCelebration={() =>
-                  dispatch({ type: 'DISMISS_STREAK_CELEBRATION' })
-                }
-              />
-            </ErrorBoundary>
             {/* Main task list (today's focus or full schedule) */}
             <ErrorBoundary>
               <TaskErrorBoundary>
@@ -367,6 +359,27 @@ function AppContent() {
                     tasks={todayFocusTasks}
                     onToggleComplete={handleToggleComplete}
                     onEdit={handleEditTask}
+                    showCompletedInline
+                    afterTaskList={
+                      <div className="space-y-3 sm:space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 sm:text-sm">
+                            Keep your streak going
+                          </h3>
+                          <span className="text-xs text-neutral-400">
+                            Daily momentum
+                          </span>
+                        </div>
+                        <ErrorBoundary>
+                          <DailyStreakCard
+                            streak={streak}
+                            onDismissCelebration={() =>
+                              dispatch({ type: 'DISMISS_STREAK_CELEBRATION' })
+                            }
+                          />
+                        </ErrorBoundary>
+                      </div>
+                    }
                   />
                 )}
               </TaskErrorBoundary>

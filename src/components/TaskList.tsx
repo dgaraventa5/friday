@@ -3,6 +3,7 @@
 // Used for both Today's Focus (inline mode) and Full Schedule (split mode).
 
 import { CheckCircle2, Sparkles } from 'lucide-react';
+import { ReactNode } from 'react';
 import { Task } from '../types/task';
 import { TaskCard } from './TaskCard';
 import { getTodayKey, getDateKey } from '../utils/dateUtils';
@@ -14,6 +15,7 @@ interface TaskListProps {
   onEdit?: (task: Task) => void;
   showCompletionCelebration?: boolean;
   showCompletedInline?: boolean; // If true, show completed/incomplete together (Today's Focus)
+  afterTaskList?: ReactNode;
 }
 
 export function TaskList({
@@ -22,6 +24,7 @@ export function TaskList({
   onEdit,
   showCompletionCelebration = false,
   showCompletedInline = false,
+  afterTaskList,
 }: TaskListProps) {
   // Split tasks into incomplete and completed
   const incompleteTasks = tasks.filter((task) => !task.completed);
@@ -80,6 +83,9 @@ export function TaskList({
             Add your first task to get started with focused productivity.
           </p>
         </div>
+        {afterTaskList && (
+          <div className="mt-6 w-full max-w-md mx-auto">{afterTaskList}</div>
+        )}
       </PageLayout>
     );
   }
@@ -124,16 +130,21 @@ export function TaskList({
       <div className="mt-3 sm:mt-4 overflow-y-auto pb-4">
         {/* Inline mode: show all tasks in order, completed and incomplete (Today's Focus) */}
         {showCompletedInline ? (
-          <div className="space-y-2 sm:space-y-3">
-            {tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onToggleComplete={onToggleComplete}
-                onEdit={onEdit}
-              />
-            ))}
-          </div>
+          <>
+            <div className="space-y-2 sm:space-y-3">
+              {tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onToggleComplete={onToggleComplete}
+                  onEdit={onEdit}
+                />
+              ))}
+            </div>
+            {afterTaskList && (
+              <div className="mt-4 sm:mt-5">{afterTaskList}</div>
+            )}
+          </>
         ) : (
           <>
             {/* Incomplete Tasks (Full Schedule) */}
@@ -148,6 +159,10 @@ export function TaskList({
                   />
                 ))}
               </div>
+            )}
+
+            {afterTaskList && (
+              <div className="mt-4 sm:mt-5">{afterTaskList}</div>
             )}
 
             {/* Completed Tasks (Full Schedule) */}
