@@ -5,9 +5,9 @@ This document outlines several gamification approaches that can strengthen user 
 ## Daily Streaks
 - **Why it works:** Reinforces habitual use by rewarding consecutive days of engagement.
 - **How it could work:**
-  - Track core actions (e.g., completing a reflection, sharing an update, submitting a check-in).
+  - Track completed tasks only, emitting a streak event when a user finishes at least one task in their local day.
   - Display a prominent streak counter on the home screen with celebratory animations for key milestones (3, 7, 14 days, etc.).
-  - Offer “streak freeze” tokens to preserve progress when a user misses a day.
+  - Offer “streak freeze” tokens to preserve progress when a user misses a day and award an additional token for every 7 consecutive days added to the streak.
 - **Success metrics:** Increased daily active users (DAU), higher retention from first to fourth week, streak completion rates.
 
 ## Achievement Badges
