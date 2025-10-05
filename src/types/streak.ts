@@ -6,8 +6,6 @@ export interface StreakCelebration {
 export interface StreakState {
   currentStreak: number;
   longestStreak: number;
-  freezeTokens: number;
   lastCompletedDate: string | null; // YYYY-MM-DD in local time
-  freezeUsedOn: string | null; // YYYY-MM-DD when a freeze was last consumed
   milestoneCelebration: StreakCelebration | null;
 }

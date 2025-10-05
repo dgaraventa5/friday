@@ -4,7 +4,6 @@
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
-import { DailyStreakCard } from './components/DailyStreakCard';
 import { TaskList } from './components/TaskList';
 import { TaskInput } from './components/TaskInput';
 import { WelcomeMessage } from './components/WelcomeMessage';
@@ -332,6 +331,7 @@ function AppContent() {
           todayTasksCompleted={
             todayFocusTasks.filter((t) => t.completed).length
           }
+          streakCount={streak.currentStreak}
         />
       </ErrorBoundary>
 
@@ -342,14 +342,6 @@ function AppContent() {
             {/* Show welcome message if onboarding not complete AND no tasks exist */}
             <ErrorBoundary>
               {!onboarding_complete && tasks.length === 0 && <WelcomeMessage />}
-            </ErrorBoundary>
-            <ErrorBoundary>
-              <DailyStreakCard
-                streak={streak}
-                onDismissCelebration={() =>
-                  dispatch({ type: 'DISMISS_STREAK_CELEBRATION' })
-                }
-              />
             </ErrorBoundary>
             {/* Main task list (today's focus or full schedule) */}
             <ErrorBoundary>

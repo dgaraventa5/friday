@@ -12,9 +12,7 @@ export const STREAK_MILESTONES = [3, 7, 14, 21, 30, 60, 100];
 export const DEFAULT_STREAK_STATE: StreakState = {
   currentStreak: 0,
   longestStreak: 0,
-  freezeTokens: 1,
   lastCompletedDate: null,
-  freezeUsedOn: null,
   milestoneCelebration: null,
 };
 
@@ -31,16 +29,10 @@ export function loadStreakState(prefix: string = ''): StreakState {
       ...parsed,
       currentStreak: Number(parsed.currentStreak) || 0,
       longestStreak: Number(parsed.longestStreak) || 0,
-      freezeTokens:
-        typeof parsed.freezeTokens === 'number' && parsed.freezeTokens >= 0
-          ? Math.floor(parsed.freezeTokens)
-          : DEFAULT_STREAK_STATE.freezeTokens,
       lastCompletedDate:
         typeof parsed.lastCompletedDate === 'string'
           ? parsed.lastCompletedDate
           : null,
-      freezeUsedOn:
-        typeof parsed.freezeUsedOn === 'string' ? parsed.freezeUsedOn : null,
       milestoneCelebration:
         parsed.milestoneCelebration &&
         typeof parsed.milestoneCelebration === 'object'
@@ -89,12 +81,9 @@ export function registerCompletion(
     : null;
 
   let currentStreak = streakState.currentStreak;
-  let freezeTokens = streakState.freezeTokens;
-  let freezeUsedOn = streakState.freezeUsedOn;
 
   if (!lastCompletion) {
     currentStreak = 1;
-    freezeUsedOn = null;
   } else {
     const dayDiff = differenceInCalendarDays(
       normalizedCompletion,
@@ -107,28 +96,17 @@ export function registerCompletion(
       return {
         ...streakState,
         lastCompletedDate: todayKey,
-        freezeUsedOn: null,
       };
     }
 
     if (dayDiff === 1) {
       currentStreak += 1;
-      freezeUsedOn = null;
-    } else if (dayDiff === 2 && freezeTokens > 0) {
-      currentStreak += 1;
-      freezeTokens -= 1;
-      freezeUsedOn = todayKey;
     } else {
       currentStreak = 1;
-      freezeUsedOn = null;
     }
   }
 
   const longestStreak = Math.max(streakState.longestStreak, currentStreak);
-
-  if (currentStreak > 0 && currentStreak % 7 === 0) {
-    freezeTokens += 1;
-  }
 
   const milestoneCelebration = STREAK_MILESTONES.includes(currentStreak)
     ? {
@@ -141,9 +119,7 @@ export function registerCompletion(
     ...streakState,
     currentStreak,
     longestStreak,
-    freezeTokens,
     lastCompletedDate: todayKey,
-    freezeUsedOn,
     milestoneCelebration,
   };
 }
