@@ -6,6 +6,7 @@ import type { CategoryHourLimit, DailyHourLimits } from '../types/user';
 import { isToday, differenceInDays, isPast } from 'date-fns';
 import { normalizeDate, getDateKey, isSameNormalizedDay } from './dateUtils';
 import logger from './logger';
+import { SCHEDULE_LOOKAHEAD_DAYS } from './scheduleConfig';
 
 // Calculate a score for a task based on importance, urgency, due date, and age
 export function calculateTaskScore(task: Task): TaskScore {
@@ -330,7 +331,7 @@ export function assignStartDates(
 
   // First, assign recurring tasks to their specific days
   const recurringAssignments: Task[] = [];
-  const maxDaysToLookAhead = 14; // Look ahead 14 days for scheduling
+  const maxDaysToLookAhead = SCHEDULE_LOOKAHEAD_DAYS; // Align look-ahead with schedule horizon
 
   // Track recurring tasks by name and date to avoid duplicates
   const recurringTaskTracker = new Map<string, Task>();

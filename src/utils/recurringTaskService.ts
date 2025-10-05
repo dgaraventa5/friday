@@ -3,8 +3,14 @@
 
 import { Task } from '../types/task';
 import { getNextRecurringDate, normalizeDate, getDateKey } from './dateUtils';
-import { addDays, isBefore } from 'date-fns';
+import { addDays, isAfter } from 'date-fns';
 import logger from './logger';
+import { SCHEDULE_LOOKAHEAD_DAYS } from './scheduleConfig';
+
+export interface RecurringTaskProcessingOptions {
+  lookAheadDays?: number;
+  referenceDate?: Date;
+}
 
 // Check if a recurring task has reached its end
 export function hasReachedEndOfRecurrence(task: Task): boolean {
@@ -99,10 +105,15 @@ export function generateNextRecurringTask(task: Task): Task | null {
 }
 
 // Process all recurring tasks to ensure future instances exist
-export function processRecurringTasks(tasks: Task[]): Task[] {
-  const today = normalizeDate(new Date());
-  // Look ahead 14 days for recurring tasks
-  const lookAheadDate = addDays(today, 14);
+export function processRecurringTasks(
+  tasks: Task[],
+  options: RecurringTaskProcessingOptions = {},
+): Task[] {
+  const { lookAheadDays = SCHEDULE_LOOKAHEAD_DAYS, referenceDate = new Date() } =
+    options;
+
+  const today = normalizeDate(referenceDate);
+  const lookAheadDate = addDays(today, lookAheadDays);
 
   const recurringTasks = tasks.filter(
     (task) =>
@@ -134,7 +145,7 @@ export function processRecurringTasks(tasks: Task[]): Task[] {
     );
 
     // Generate instances until we reach the look-ahead date or the task's recurrence end
-    while (isBefore(nextDate, lookAheadDate)) {
+    while (!isAfter(nextDate, lookAheadDate)) {
       // Check if this task instance already exists
       const taskName = currentTask.name;
       const dateString = getDateKey(nextDate);

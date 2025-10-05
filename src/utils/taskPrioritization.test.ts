@@ -5,6 +5,16 @@ import {
 } from './taskPrioritization';
 import { Task } from '../types/task';
 import { normalizeDate } from './dateUtils';
+import { processRecurringTasks } from './recurringTaskService';
+import { SCHEDULE_LOOKAHEAD_DAYS } from './scheduleConfig';
+import { addDays } from 'date-fns';
+
+beforeAll(() => {
+  (global as any).crypto = {
+    ...((global as any).crypto || {}),
+    randomUUID: () => 'test-uuid',
+  };
+});
 
 describe('assignStartDates with recurring tasks', () => {
   it('does not roll over unfinished recurring tasks to future days', () => {
@@ -52,6 +62,62 @@ describe('assignStartDates with recurring tasks', () => {
 
     expect(tasksOnSep4).toHaveLength(1);
     expect(tasksOnSep4[0].dueDate.getTime()).toBe(baseDate.getTime());
+  });
+});
+
+describe('assignStartDates schedule horizon', () => {
+  it('surfaces weekly recurring tasks beyond two weeks in the full schedule', () => {
+    const baseDate = normalizeDate(new Date('2025-01-06')); // Monday
+    const weeklyCategory = {
+      id: 'weekly',
+      name: 'Work',
+      color: 'blue',
+      dailyLimit: 4,
+      icon: '💼',
+    };
+
+    const weeklyTask: Task = {
+      id: 'weekly-1',
+      name: 'Weekly Review',
+      category: weeklyCategory,
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: baseDate,
+      startDate: baseDate,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+      completed: false,
+      estimatedHours: 1,
+      isRecurring: true,
+      recurringInterval: 'weekly',
+      recurringDays: [baseDate.getDay()],
+      recurringEndType: 'never',
+    };
+
+    const processedTasks = processRecurringTasks([weeklyTask], {
+      referenceDate: baseDate,
+      lookAheadDays: SCHEDULE_LOOKAHEAD_DAYS,
+    });
+
+    const scheduled = assignStartDates(
+      processedTasks,
+      4,
+      DEFAULT_CATEGORY_LIMITS,
+      baseDate,
+    );
+
+    const thirdWeekDate = normalizeDate(addDays(baseDate, 21));
+    const thirdWeekOccurrences = scheduled.filter(
+      (task) =>
+        task.name === 'Weekly Review' &&
+        task.startDate &&
+        task.startDate.getTime() === thirdWeekDate.getTime(),
+    );
+
+    expect(thirdWeekOccurrences).toHaveLength(1);
+    expect(thirdWeekOccurrences[0].dueDate.getTime()).toBe(
+      thirdWeekDate.getTime(),
+    );
   });
 });
 
