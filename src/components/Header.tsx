@@ -92,11 +92,16 @@ export function Header({
           <div className="flex items-center gap-4">
             {/* Daily streak indicator */}
             <div
-              className="flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700"
+              className="relative flex items-center justify-center text-orange-600"
+              style={{ width: iconSize, height: iconSize }}
+              role="img"
               aria-label={`Daily streak: ${streakCount} day${streakCount === 1 ? '' : 's'}`}
             >
-              <Flame className="h-4 w-4" aria-hidden />
-              <span>{streakCount}</span>
+              <div className="absolute inset-0 rounded-full border-2 border-orange-200 bg-orange-50" />
+              <div className="relative flex flex-col items-center justify-center gap-0.5">
+                <Flame className="h-4 w-4" aria-hidden />
+                <span className="text-sm font-semibold leading-tight">{streakCount}</span>
+              </div>
             </div>
 
             {/* Progress Circle */}
