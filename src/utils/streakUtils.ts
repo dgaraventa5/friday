@@ -55,6 +55,81 @@ export function saveStreakState(
   );
 }
 
+function normalizeStoredDate(dateString: string | null): Date | null {
+  if (!dateString) {
+    return null;
+  }
+
+  const parsed = parseLocalDateInput(dateString);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return normalizeDate(parsed);
+}
+
+function mergeMilestone(
+  current: StreakState,
+  incoming: StreakState,
+): StreakState['milestoneCelebration'] {
+  if (incoming.milestoneCelebration) {
+    return incoming.milestoneCelebration;
+  }
+
+  return current.milestoneCelebration;
+}
+
+export function mergeStreakStates(
+  current: StreakState,
+  incoming: StreakState,
+): StreakState {
+  const currentDate = normalizeStoredDate(current.lastCompletedDate);
+  const incomingDate = normalizeStoredDate(incoming.lastCompletedDate);
+
+  if (!incomingDate) {
+    // No persisted streak information to merge in
+    return { ...current };
+  }
+
+  if (!currentDate) {
+    // Nothing tracked yet locally - take the incoming state as-is
+    return {
+      ...DEFAULT_STREAK_STATE,
+      ...incoming,
+      longestStreak: Math.max(current.longestStreak, incoming.longestStreak),
+    };
+  }
+
+  const dateDiff = differenceInCalendarDays(incomingDate, currentDate);
+
+  if (Number.isNaN(dateDiff)) {
+    return { ...current };
+  }
+
+  if (dateDiff > 0) {
+    // Incoming streak is more recent than what we currently have - prefer it
+    return {
+      ...current,
+      ...incoming,
+      longestStreak: Math.max(current.longestStreak, incoming.longestStreak),
+    };
+  }
+
+  if (dateDiff < 0) {
+    // Local state already has a more recent completion - keep it
+    return { ...current };
+  }
+
+  // Same completion day - merge the metadata while keeping the highest streak values
+  return {
+    ...current,
+    ...incoming,
+    currentStreak: Math.max(current.currentStreak, incoming.currentStreak),
+    longestStreak: Math.max(current.longestStreak, incoming.longestStreak),
+    milestoneCelebration: mergeMilestone(current, incoming),
+  };
+}
+
 export function getNextMilestone(currentStreak: number): number | null {
   for (const milestone of STREAK_MILESTONES) {
     if (milestone > currentStreak) {

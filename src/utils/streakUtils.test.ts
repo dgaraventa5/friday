@@ -1,5 +1,9 @@
 import { addDays } from 'date-fns';
-import { registerCompletion, DEFAULT_STREAK_STATE } from './streakUtils';
+import {
+  registerCompletion,
+  DEFAULT_STREAK_STATE,
+  mergeStreakStates,
+} from './streakUtils';
 import { parseLocalDateInput } from './dateUtils';
 
 describe('registerCompletion', () => {
@@ -45,5 +49,81 @@ describe('registerCompletion', () => {
     expect(state.currentStreak).toBe(3);
     expect(state.milestoneCelebration?.streak).toBe(3);
     expect(state.longestStreak).toBe(3);
+  });
+});
+
+describe('mergeStreakStates', () => {
+  const yesterday = '2025-01-01';
+  const today = '2025-01-02';
+
+  it('prefers the state with the more recent completion date', () => {
+    const current = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 2,
+      longestStreak: 3,
+      lastCompletedDate: today,
+    };
+
+    const incoming = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 5,
+      longestStreak: 5,
+      lastCompletedDate: yesterday,
+    };
+
+    const result = mergeStreakStates(current, incoming);
+
+    expect(result.currentStreak).toBe(2);
+    expect(result.lastCompletedDate).toBe(today);
+    expect(result.longestStreak).toBe(3);
+  });
+
+  it('adopts the incoming state when it contains newer progress', () => {
+    const current = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 2,
+      longestStreak: 3,
+      lastCompletedDate: yesterday,
+    };
+
+    const incoming = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 4,
+      longestStreak: 4,
+      lastCompletedDate: today,
+    };
+
+    const result = mergeStreakStates(current, incoming);
+
+    expect(result.currentStreak).toBe(4);
+    expect(result.lastCompletedDate).toBe(today);
+    expect(result.longestStreak).toBe(4);
+  });
+
+  it('keeps the highest streak values when the completion dates match', () => {
+    const current = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 3,
+      longestStreak: 4,
+      lastCompletedDate: today,
+      milestoneCelebration: null,
+    };
+
+    const incoming = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 5,
+      longestStreak: 6,
+      lastCompletedDate: today,
+      milestoneCelebration: {
+        streak: 5,
+        achievedAt: new Date().toISOString(),
+      },
+    };
+
+    const result = mergeStreakStates(current, incoming);
+
+    expect(result.currentStreak).toBe(5);
+    expect(result.longestStreak).toBe(6);
+    expect(result.milestoneCelebration?.streak).toBe(5);
   });
 });

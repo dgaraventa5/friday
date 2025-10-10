@@ -46,6 +46,7 @@ import {
   registerCompletion,
   clearStreakCelebration,
   saveStreakState,
+  mergeStreakStates,
 } from '../utils/streakUtils';
 
 // Define the shape of our global state
@@ -82,7 +83,11 @@ type AppAction =
   | { type: 'SET_ONBOARDING_COMPLETE'; payload: boolean }
   | { type: 'PROCESS_RECURRING_TASKS' }
   | { type: 'NORMALIZE_ALL_DATES' }
-  | { type: 'SET_STREAK'; payload: StreakState }
+  | {
+      type: 'SET_STREAK';
+      payload: StreakState;
+      mode?: 'merge' | 'replace';
+    }
   | { type: 'REGISTER_TASK_COMPLETION'; payload: { date: Date } }
   | { type: 'DISMISS_STREAK_CELEBRATION' };
 
@@ -228,8 +233,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
         `[AppContext] Setting onboarding_complete to: ${action.payload}`,
       );
       return { ...state, onboarding_complete: action.payload };
-    case 'SET_STREAK':
-      return { ...state, streak: action.payload };
+    case 'SET_STREAK': {
+      const nextStreak =
+        action.mode === 'replace'
+          ? { ...action.payload }
+          : mergeStreakStates(state.streak, action.payload);
+      return { ...state, streak: nextStreak };
+    }
     case 'REGISTER_TASK_COMPLETION':
       return {
         ...state,
@@ -484,7 +494,11 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_TASKS', payload: [] });
       dispatch({ type: 'SET_CATEGORIES', payload: [] });
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: false });
-      dispatch({ type: 'SET_STREAK', payload: { ...DEFAULT_STREAK_STATE } });
+      dispatch({
+        type: 'SET_STREAK',
+        payload: { ...DEFAULT_STREAK_STATE },
+        mode: 'replace',
+      });
       setIsDataLoaded(true);
     }
   }, [userId, testMode, dispatch]);
