@@ -117,7 +117,15 @@ export function mergeStreakStates(
 
   if (dateDiff < 0) {
     // Local state already has a more recent completion - keep it
-    return { ...current };
+    return {
+      ...current,
+      longestStreak: Math.max(
+        current.longestStreak,
+        incoming.longestStreak,
+      ),
+      milestoneCelebration:
+        current.milestoneCelebration ?? incoming.milestoneCelebration ?? null,
+    };
   }
 
   // Same completion day - merge the metadata while keeping the highest streak values
