@@ -36,7 +36,8 @@ export function Header({
     }
   }, [user]);
 
-  const iconSize = 40;
+  const iconSize = 44;
+  const innerIconSize = iconSize - 10;
   // Height of the logo (sun icon + text)
   const logoHeight = 36;
 
@@ -98,8 +99,11 @@ export function Header({
               aria-label={`Daily streak: ${streakCount} day${streakCount === 1 ? '' : 's'}`}
             >
               <div className="absolute inset-0 rounded-full border-2 border-orange-200 bg-orange-50" />
-              <div className="relative flex flex-col items-center justify-center gap-0.5">
-                <Flame className="h-4 w-4" aria-hidden />
+              <div
+                className="relative flex flex-col items-center justify-center gap-0.5 rounded-full"
+                style={{ width: innerIconSize, height: innerIconSize }}
+              >
+                <Flame className="h-5 w-5" aria-hidden />
                 <span className="text-sm font-semibold leading-tight">{streakCount}</span>
               </div>
             </div>
@@ -120,7 +124,7 @@ export function Header({
                   setShowUserProfile(!showUserProfile);
                   setShowSettings(false);
                 }}
-                className={`flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors duration-200`}
+                className={`flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-full transition-colors duration-200 overflow-hidden border border-neutral-200`}
                 title="User Profile"
                 style={{ width: iconSize, height: iconSize }}
               >
@@ -128,8 +132,8 @@ export function Header({
                   <img
                     src={user.photoURL}
                     alt={user.displayName || 'User'}
-                    className="rounded-full"
-                    style={{ width: iconSize - 12, height: iconSize - 12 }}
+                    className="object-cover"
+                    style={{ width: '100%', height: '100%' }}
                     onError={() => {
                       console.error(
                         'Failed to load user profile image:',
@@ -139,10 +143,7 @@ export function Header({
                     }}
                   />
                 ) : (
-                  <div
-                    className="rounded-full bg-blue-500 flex items-center justify-center text-white"
-                    style={{ width: iconSize - 12, height: iconSize - 12 }}
-                  >
+                  <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white">
                     {user?.displayName?.charAt(0) || user?.email?.charAt(0) || (
                       <User className="w-6 h-6" />
                     )}
