@@ -128,7 +128,12 @@ export function EditTaskModal({
           <FormField
             label="Due Date"
             type="date"
-            value={formatDateInput(new Date(editedTask.dueDate))}
+            value={(() => {
+              const dueDate = new Date(editedTask.dueDate);
+              return Number.isNaN(dueDate.getTime())
+                ? ''
+                : formatDateInput(dueDate);
+            })()}
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
               handleChange('dueDate', parseLocalDateInput(e.target.value))
             }
