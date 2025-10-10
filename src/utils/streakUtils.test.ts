@@ -75,7 +75,35 @@ describe('mergeStreakStates', () => {
 
     expect(result.currentStreak).toBe(2);
     expect(result.lastCompletedDate).toBe(today);
-    expect(result.longestStreak).toBe(3);
+    expect(result.longestStreak).toBe(5);
+  });
+
+  it('preserves milestone metadata from older state when local progress is newer', () => {
+    const milestone = {
+      streak: 7,
+      achievedAt: new Date().toISOString(),
+    };
+
+    const current = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 1,
+      longestStreak: 2,
+      lastCompletedDate: today,
+      milestoneCelebration: null,
+    };
+
+    const incoming = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 4,
+      longestStreak: 7,
+      lastCompletedDate: yesterday,
+      milestoneCelebration: milestone,
+    };
+
+    const result = mergeStreakStates(current, incoming);
+
+    expect(result.longestStreak).toBe(7);
+    expect(result.milestoneCelebration).toEqual(milestone);
   });
 
   it('adopts the incoming state when it contains newer progress', () => {
