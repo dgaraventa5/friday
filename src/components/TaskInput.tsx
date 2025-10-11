@@ -86,6 +86,7 @@ export function TaskInput({
     // Create new Task object
     const newTask: Task = {
       id: crypto.randomUUID(),
+      recurringSeriesId: task.isRecurring ? crypto.randomUUID() : undefined,
       name: task.name!,
       category: task.category!,
       dueDate: task.dueDate!,

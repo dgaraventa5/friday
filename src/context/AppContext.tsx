@@ -120,6 +120,190 @@ const AppContext = createContext<{
   toggleTestMode: () => void;
 } | null>(null);
 
+function resolveRecurringSeriesId(
+  updatedTask: Task,
+  originalTask?: Task,
+): string | null {
+  if (updatedTask.isRecurring && updatedTask.recurringInterval) {
+    return (
+      updatedTask.recurringSeriesId ||
+      originalTask?.recurringSeriesId ||
+      updatedTask.id
+    );
+  }
+
+  if (originalTask?.isRecurring && originalTask.recurringInterval) {
+    return (
+      updatedTask.recurringSeriesId ||
+      originalTask.recurringSeriesId ||
+      originalTask.id
+    );
+  }
+
+  return updatedTask.recurringSeriesId ?? null;
+}
+
+function belongsToRecurringSeries(
+  task: Task,
+  seriesId: string,
+  updatedTask: Task,
+  originalTask?: Task,
+): boolean {
+  const taskSeriesId = task.recurringSeriesId || task.id;
+  if (taskSeriesId === seriesId) {
+    return true;
+  }
+
+  const reference =
+    (updatedTask.isRecurring && updatedTask.recurringInterval && updatedTask) ||
+    (originalTask && originalTask.isRecurring && originalTask.recurringInterval
+      ? originalTask
+      : null);
+
+  if (!reference) {
+    return false;
+  }
+
+  const candidateNames = new Set<string>();
+  candidateNames.add(updatedTask.name);
+  if (originalTask) {
+    candidateNames.add(originalTask.name);
+  }
+
+  const sameName = candidateNames.has(task.name);
+
+  const candidateCategoryIds = new Set<string | undefined>();
+  candidateCategoryIds.add(updatedTask.category?.id);
+  if (originalTask) {
+    candidateCategoryIds.add(originalTask.category?.id);
+  }
+
+  const sameCategoryId = candidateCategoryIds.has(task.category?.id);
+
+  if (!sameName || !sameCategoryId) {
+    return false;
+  }
+
+  const intervals = new Set<string>();
+  if (reference.recurringInterval) {
+    intervals.add(reference.recurringInterval);
+  }
+  if (updatedTask.recurringInterval) {
+    intervals.add(updatedTask.recurringInterval);
+  }
+  if (originalTask?.recurringInterval) {
+    intervals.add(originalTask.recurringInterval);
+  }
+
+  if (task.recurringInterval && intervals.size > 0) {
+    return intervals.has(task.recurringInterval);
+  }
+
+  return true;
+}
+
+function syncRecurringSeries(
+  tasks: Task[],
+  updatedTask: Task,
+  originalTask?: Task,
+): Task[] {
+  const seriesId = resolveRecurringSeriesId(updatedTask, originalTask);
+  if (!seriesId) {
+    return tasks;
+  }
+
+  const allowedDays =
+    updatedTask.isRecurring &&
+    updatedTask.recurringInterval === 'weekly' &&
+    Array.isArray(updatedTask.recurringDays)
+      ? new Set(updatedTask.recurringDays)
+      : null;
+
+  const today = normalizeDate(new Date());
+
+  return tasks.reduce<Task[]>((acc, task) => {
+    const matchesSeries = belongsToRecurringSeries(
+      task,
+      seriesId,
+      updatedTask,
+      originalTask,
+    );
+
+    if (!matchesSeries) {
+      acc.push(task);
+      return acc;
+    }
+
+    if (task.id === updatedTask.id) {
+      if (updatedTask.isRecurring && updatedTask.recurringInterval) {
+        acc.push({
+          ...task,
+          recurringSeriesId: seriesId,
+          isRecurring: true,
+          recurringInterval: updatedTask.recurringInterval,
+          recurringDays: updatedTask.recurringDays,
+          recurringEndType: updatedTask.recurringEndType,
+          recurringEndCount: updatedTask.recurringEndCount,
+        });
+      } else {
+        acc.push({
+          ...task,
+          isRecurring: false,
+          recurringInterval: undefined,
+          recurringDays: undefined,
+          recurringEndType: undefined,
+          recurringEndCount: undefined,
+          recurringCurrentCount: undefined,
+          recurringSeriesId: undefined,
+        });
+      }
+      return acc;
+    }
+
+    if (!updatedTask.isRecurring || !updatedTask.recurringInterval) {
+      if (task.completed) {
+        acc.push({
+          ...task,
+          isRecurring: false,
+          recurringInterval: undefined,
+          recurringDays: undefined,
+          recurringEndType: undefined,
+          recurringEndCount: undefined,
+          recurringCurrentCount: undefined,
+          recurringSeriesId: undefined,
+        });
+      }
+      return acc;
+    }
+
+    if (
+      allowedDays &&
+      allowedDays.size > 0 &&
+      !task.completed
+    ) {
+      const dueDate = normalizeDate(task.dueDate);
+      if (
+        dueDate.getTime() >= today.getTime() &&
+        !allowedDays.has(dueDate.getDay())
+      ) {
+        return acc;
+      }
+    }
+
+    acc.push({
+      ...task,
+      isRecurring: true,
+      recurringSeriesId: seriesId,
+      recurringInterval: updatedTask.recurringInterval,
+      recurringDays: updatedTask.recurringDays,
+      recurringEndType: updatedTask.recurringEndType,
+      recurringEndCount: updatedTask.recurringEndCount,
+    });
+
+    return acc;
+  }, []);
+}
+
 // Reducer function to handle state updates
 // Handles all action types and returns the new state
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -128,13 +312,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, tasks: action.payload };
     case 'ADD_TASK':
       return { ...state, tasks: [...state.tasks, action.payload] };
-    case 'UPDATE_TASK':
+    case 'UPDATE_TASK': {
+      const originalTask = state.tasks.find(
+        (task) => task.id === action.payload.id,
+      );
+
+      let updatedTasks = state.tasks.map((task) =>
+        task.id === action.payload.id ? action.payload : task,
+      );
+
+      if (originalTask?.isRecurring || action.payload.isRecurring) {
+        updatedTasks = syncRecurringSeries(updatedTasks, action.payload, originalTask);
+
+        if (action.payload.isRecurring && action.payload.recurringInterval) {
+          updatedTasks = processRecurringTasks(updatedTasks);
+        }
+      }
+
       return {
         ...state,
-        tasks: state.tasks.map((task) =>
-          task.id === action.payload.id ? action.payload : task,
-        ),
+        tasks: updatedTasks,
       };
+    }
     case 'DELETE_TASK':
       return {
         ...state,

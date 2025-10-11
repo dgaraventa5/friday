@@ -203,7 +203,23 @@ function AppContent() {
 
   // Update task after editing
   const handleUpdateTask = (updatedTask: Task) => {
-    dispatch({ type: 'UPDATE_TASK', payload: updatedTask });
+    const originalTask = tasks.find((task) => task.id === updatedTask.id);
+
+    let taskToUpdate = updatedTask;
+
+    if (updatedTask.isRecurring) {
+      const seriesId =
+        updatedTask.recurringSeriesId ||
+        originalTask?.recurringSeriesId ||
+        originalTask?.id ||
+        crypto.randomUUID();
+
+      if (taskToUpdate.recurringSeriesId !== seriesId) {
+        taskToUpdate = { ...taskToUpdate, recurringSeriesId: seriesId };
+      }
+    }
+
+    dispatch({ type: 'UPDATE_TASK', payload: taskToUpdate });
     setEditingTask(null);
   };
 
