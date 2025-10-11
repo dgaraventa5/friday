@@ -63,6 +63,22 @@ export function EditTaskModal({
     const updatedTask: Task = {
       ...editedTask,
       recurringDays: editedTask.isRecurring ? recurringDays : undefined,
+      recurringInterval: editedTask.isRecurring
+        ? editedTask.recurringInterval
+        : undefined,
+      recurringEndType: editedTask.isRecurring
+        ? editedTask.recurringEndType
+        : undefined,
+      recurringEndCount:
+        editedTask.isRecurring && editedTask.recurringEndType === 'after'
+          ? editedTask.recurringEndCount
+          : undefined,
+      recurringCurrentCount: editedTask.isRecurring
+        ? editedTask.recurringCurrentCount
+        : undefined,
+      recurringSeriesId: editedTask.isRecurring
+        ? editedTask.recurringSeriesId
+        : undefined,
       updatedAt: new Date(),
     };
 

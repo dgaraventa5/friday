@@ -18,6 +18,7 @@ export interface Task {
   recurringEndType?: 'never' | 'after'; // Type of end repeat
   recurringEndCount?: number; // Number of occurrences if 'after' is selected
   recurringCurrentCount?: number; // Current count of occurrences (for tracking)
+  recurringSeriesId?: string; // Identifier shared by all instances in a recurring series
 }
 
 export interface Category {

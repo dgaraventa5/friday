@@ -46,6 +46,8 @@ export function generateNextRecurringTask(task: Task): Task | null {
     return null;
   }
 
+  const seriesId = task.recurringSeriesId ?? task.id;
+
   const nextDueDate = getNextRecurringDate(
     task.dueDate,
     task.recurringInterval,
@@ -82,6 +84,7 @@ export function generateNextRecurringTask(task: Task): Task | null {
       completedAt: undefined,
       recurringCurrentCount,
       startDate: futureDueDate, // Set startDate to the futureDueDate
+      recurringSeriesId: seriesId,
     };
   }
 
@@ -101,6 +104,7 @@ export function generateNextRecurringTask(task: Task): Task | null {
     completedAt: undefined,
     recurringCurrentCount,
     startDate: nextDueDate, // Set startDate to the nextDueDate
+    recurringSeriesId: seriesId,
   };
 }
 
@@ -115,7 +119,18 @@ export function processRecurringTasks(
   const today = normalizeDate(referenceDate);
   const lookAheadDate = addDays(today, lookAheadDays);
 
-  const recurringTasks = tasks.filter(
+  // Ensure every recurring task in the list has a stable series identifier
+  const normalizedTasks = tasks.map((task) => {
+    if (task.isRecurring && task.recurringInterval) {
+      const seriesId = task.recurringSeriesId ?? task.id;
+      if (task.recurringSeriesId !== seriesId) {
+        return { ...task, recurringSeriesId: seriesId };
+      }
+    }
+    return task;
+  });
+
+  const recurringTasks = normalizedTasks.filter(
     (task) =>
       task.isRecurring &&
       task.recurringInterval &&
@@ -130,8 +145,9 @@ export function processRecurringTasks(
   const existingTasksMap = new Map<string, boolean>();
 
   // First, populate the map with existing tasks
-  tasks.forEach((task) => {
-    const taskDateKey = `${task.name}_${getDateKey(task.dueDate)}`;
+  normalizedTasks.forEach((task) => {
+    const seriesId = task.recurringSeriesId ?? task.id;
+    const taskDateKey = `${seriesId}_${task.name}_${getDateKey(task.dueDate)}`;
     existingTasksMap.set(taskDateKey, true);
   });
 
@@ -149,7 +165,8 @@ export function processRecurringTasks(
       // Check if this task instance already exists
       const taskName = currentTask.name;
       const dateString = getDateKey(nextDate);
-      const taskDateKey = `${taskName}_${dateString}`;
+      const seriesId = currentTask.recurringSeriesId ?? task.recurringSeriesId ?? task.id;
+      const taskDateKey = `${seriesId}_${taskName}_${dateString}`;
 
       // Calculate the next recurrence count
       const nextRecurringCount =
@@ -181,6 +198,7 @@ export function processRecurringTasks(
           updatedAt: new Date(),
           completedAt: undefined,
           recurringCurrentCount: nextRecurringCount,
+          recurringSeriesId: seriesId,
         };
 
         newTasks.push(newTask);
@@ -205,7 +223,7 @@ export function processRecurringTasks(
   });
 
   logger.log(`Generated ${newTasks.length} future recurring task instances`);
-  return [...tasks, ...newTasks];
+  return [...normalizedTasks, ...newTasks];
 }
 
 // Handle recurring task completion
