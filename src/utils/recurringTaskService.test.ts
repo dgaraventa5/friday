@@ -230,5 +230,90 @@ describe('Recurring Task Service', () => {
       const uniqueKeys = new Set(occurrenceKeys);
       expect(uniqueKeys.size).toBe(occurrenceKeys.length);
     });
+
+    it('assigns a stable series id to legacy weekly tasks before generating new instances', () => {
+      const baseDate = normalizeDate(new Date('2025-02-03')); // Monday
+      const legacyInstances: Task[] = Array.from({ length: 3 }).map((_, index) => {
+        const dueDate = addDays(baseDate, index * 7);
+        return createMockTask({
+          id: `legacy-instance-${index}`,
+          name: 'Legacy Workout',
+          dueDate,
+          startDate: dueDate,
+          createdAt: addDays(dueDate, -2),
+          updatedAt: addDays(dueDate, -2),
+          recurringInterval: 'weekly',
+          recurringDays: [dueDate.getDay()],
+          recurringSeriesId: undefined,
+        });
+      });
+
+      const processed = processRecurringTasks(legacyInstances, {
+        referenceDate: baseDate,
+      });
+
+      const workoutTasks = processed.filter((task) => task.name === 'Legacy Workout');
+      const seriesIds = new Set(
+        workoutTasks.map((task) => task.recurringSeriesId).filter(Boolean),
+      );
+
+      expect(seriesIds.size).toBe(1);
+
+      const occurrencesByDate = workoutTasks.reduce<Record<string, number>>(
+        (acc, task) => {
+          const key = getDateKey(task.dueDate);
+          acc[key] = (acc[key] ?? 0) + 1;
+          return acc;
+        },
+        {},
+      );
+
+      Object.values(occurrencesByDate).forEach((count) => {
+        expect(count).toBe(1);
+      });
+    });
+
+    it('keeps separate series ids for legacy tasks that share the same recurrence pattern', () => {
+      const baseDate = normalizeDate(new Date('2025-03-10')); // Monday
+
+      const makeLegacyTask = (offsetWeeks: number, suffix: string): Task => {
+        const dueDate = addDays(baseDate, offsetWeeks * 7);
+        return createMockTask({
+          id: `${suffix}-${offsetWeeks}`,
+          name: 'Morning Workout',
+          dueDate,
+          startDate: dueDate,
+          createdAt: addDays(dueDate, -1),
+          updatedAt: addDays(dueDate, -1),
+          recurringInterval: 'weekly',
+          recurringDays: [dueDate.getDay()],
+          recurringSeriesId: undefined,
+        });
+      };
+
+      const legacySeriesA = Array.from({ length: 2 }).map((_, index) =>
+        makeLegacyTask(index, 'series-a'),
+      );
+      const legacySeriesB = Array.from({ length: 2 }).map((_, index) =>
+        makeLegacyTask(index, 'series-b'),
+      );
+
+      const processed = processRecurringTasks(
+        [...legacySeriesA, ...legacySeriesB],
+        { referenceDate: baseDate },
+      );
+
+      const mondayKey = getDateKey(baseDate);
+      const mondayOccurrences = processed.filter(
+        (task) =>
+          task.name === 'Morning Workout' && getDateKey(task.dueDate) === mondayKey,
+      );
+
+      const mondaySeriesIds = new Set(
+        mondayOccurrences.map((task) => task.recurringSeriesId).filter(Boolean),
+      );
+
+      expect(mondaySeriesIds.size).toBe(2);
+    });
   });
 });

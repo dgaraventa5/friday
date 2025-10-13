@@ -31,7 +31,10 @@ import {
   loadOnboardingStatusFromFirestore,
   migrateLocalStorageToFirestore,
 } from '../utils/firestoreService';
-import { processRecurringTasks } from '../utils/recurringTaskService';
+import {
+  ensureStableRecurringSeriesIds,
+  processRecurringTasks,
+} from '../utils/recurringTaskService';
 import { useAuth } from './AuthContext';
 import { normalizeDate } from '../utils/dateUtils';
 import {
@@ -143,63 +146,8 @@ function resolveRecurringSeriesId(
   return updatedTask.recurringSeriesId ?? null;
 }
 
-function belongsToRecurringSeries(
-  task: Task,
-  seriesId: string,
-  updatedTask: Task,
-  originalTask?: Task,
-): boolean {
-  const taskSeriesId = task.recurringSeriesId || task.id;
-  if (taskSeriesId === seriesId) {
-    return true;
-  }
-
-  const reference =
-    (updatedTask.isRecurring && updatedTask.recurringInterval && updatedTask) ||
-    (originalTask && originalTask.isRecurring && originalTask.recurringInterval
-      ? originalTask
-      : null);
-
-  if (!reference) {
-    return false;
-  }
-
-  const candidateNames = new Set<string>();
-  candidateNames.add(updatedTask.name);
-  if (originalTask) {
-    candidateNames.add(originalTask.name);
-  }
-
-  const sameName = candidateNames.has(task.name);
-
-  const candidateCategoryIds = new Set<string | undefined>();
-  candidateCategoryIds.add(updatedTask.category?.id);
-  if (originalTask) {
-    candidateCategoryIds.add(originalTask.category?.id);
-  }
-
-  const sameCategoryId = candidateCategoryIds.has(task.category?.id);
-
-  if (!sameName || !sameCategoryId) {
-    return false;
-  }
-
-  const intervals = new Set<string>();
-  if (reference.recurringInterval) {
-    intervals.add(reference.recurringInterval);
-  }
-  if (updatedTask.recurringInterval) {
-    intervals.add(updatedTask.recurringInterval);
-  }
-  if (originalTask?.recurringInterval) {
-    intervals.add(originalTask.recurringInterval);
-  }
-
-  if (task.recurringInterval && intervals.size > 0) {
-    return intervals.has(task.recurringInterval);
-  }
-
-  return true;
+function belongsToRecurringSeries(task: Task, seriesId: string): boolean {
+  return task.recurringSeriesId === seriesId;
 }
 
 function syncRecurringSeries(
@@ -207,27 +155,32 @@ function syncRecurringSeries(
   updatedTask: Task,
   originalTask?: Task,
 ): Task[] {
-  const seriesId = resolveRecurringSeriesId(updatedTask, originalTask);
+  const normalizedTasks = ensureStableRecurringSeriesIds(tasks);
+  const normalizedUpdatedTask =
+    normalizedTasks.find((task) => task.id === updatedTask.id) || updatedTask;
+  const normalizedOriginalTask = originalTask
+    ? normalizedTasks.find((task) => task.id === originalTask.id) || originalTask
+    : undefined;
+
+  const seriesId = resolveRecurringSeriesId(
+    normalizedUpdatedTask,
+    normalizedOriginalTask,
+  );
   if (!seriesId) {
-    return tasks;
+    return normalizedTasks;
   }
 
   const allowedDays =
-    updatedTask.isRecurring &&
-    updatedTask.recurringInterval === 'weekly' &&
-    Array.isArray(updatedTask.recurringDays)
-      ? new Set(updatedTask.recurringDays)
+    normalizedUpdatedTask.isRecurring &&
+    normalizedUpdatedTask.recurringInterval === 'weekly' &&
+    Array.isArray(normalizedUpdatedTask.recurringDays)
+      ? new Set(normalizedUpdatedTask.recurringDays)
       : null;
 
   const today = normalizeDate(new Date());
 
-  return tasks.reduce<Task[]>((acc, task) => {
-    const matchesSeries = belongsToRecurringSeries(
-      task,
-      seriesId,
-      updatedTask,
-      originalTask,
-    );
+  return normalizedTasks.reduce<Task[]>((acc, task) => {
+    const matchesSeries = belongsToRecurringSeries(task, seriesId);
 
     if (!matchesSeries) {
       acc.push(task);
@@ -235,19 +188,19 @@ function syncRecurringSeries(
     }
 
     if (task.id === updatedTask.id) {
-      if (updatedTask.isRecurring && updatedTask.recurringInterval) {
+      if (normalizedUpdatedTask.isRecurring && normalizedUpdatedTask.recurringInterval) {
         acc.push({
-          ...task,
+          ...normalizedUpdatedTask,
           recurringSeriesId: seriesId,
           isRecurring: true,
-          recurringInterval: updatedTask.recurringInterval,
-          recurringDays: updatedTask.recurringDays,
-          recurringEndType: updatedTask.recurringEndType,
-          recurringEndCount: updatedTask.recurringEndCount,
+          recurringInterval: normalizedUpdatedTask.recurringInterval,
+          recurringDays: normalizedUpdatedTask.recurringDays,
+          recurringEndType: normalizedUpdatedTask.recurringEndType,
+          recurringEndCount: normalizedUpdatedTask.recurringEndCount,
         });
       } else {
         acc.push({
-          ...task,
+          ...normalizedUpdatedTask,
           isRecurring: false,
           recurringInterval: undefined,
           recurringDays: undefined,
@@ -260,7 +213,7 @@ function syncRecurringSeries(
       return acc;
     }
 
-    if (!updatedTask.isRecurring || !updatedTask.recurringInterval) {
+    if (!normalizedUpdatedTask.isRecurring || !normalizedUpdatedTask.recurringInterval) {
       if (task.completed) {
         acc.push({
           ...task,
@@ -294,10 +247,10 @@ function syncRecurringSeries(
       ...task,
       isRecurring: true,
       recurringSeriesId: seriesId,
-      recurringInterval: updatedTask.recurringInterval,
-      recurringDays: updatedTask.recurringDays,
-      recurringEndType: updatedTask.recurringEndType,
-      recurringEndCount: updatedTask.recurringEndCount,
+      recurringInterval: normalizedUpdatedTask.recurringInterval,
+      recurringDays: normalizedUpdatedTask.recurringDays,
+      recurringEndType: normalizedUpdatedTask.recurringEndType,
+      recurringEndCount: normalizedUpdatedTask.recurringEndCount,
     });
 
     return acc;
