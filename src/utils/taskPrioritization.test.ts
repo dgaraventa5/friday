@@ -2,9 +2,10 @@ import {
   assignStartDates,
   DEFAULT_CATEGORY_LIMITS,
   checkCategoryLimits,
+  normalizeCategoryLimits,
 } from './taskPrioritization';
-import { Task } from '../types/task';
-import { normalizeDate } from './dateUtils';
+import { Category, Task } from '../types/task';
+import { getDateKey, normalizeDate } from './dateUtils';
 import { processRecurringTasks } from './recurringTaskService';
 import { SCHEDULE_LOOKAHEAD_DAYS } from './scheduleConfig';
 import { addDays } from 'date-fns';
@@ -351,5 +352,129 @@ describe('checkCategoryLimits', () => {
     expect(futureTaskWithTodayStart.dueDate.getTime()).toBe(
       normalizedTomorrow.getTime(),
     );
+  });
+});
+
+describe('assignStartDates category limits', () => {
+  const baseCategory: Category = {
+    id: 'home',
+    name: 'Home',
+    color: '#00ff00',
+    icon: 'home',
+    dailyLimit: 3,
+  };
+
+  const buildTask = (id: string, dueDate: Date, estimatedHours = 1): Task => ({
+    id,
+    name: `Task ${id}`,
+    category: baseCategory,
+    importance: 'important',
+    urgency: 'urgent',
+    dueDate,
+    startDate: dueDate,
+    createdAt: dueDate,
+    updatedAt: dueDate,
+    completed: false,
+    estimatedHours,
+  });
+
+  it('respects weekend hour limits for future tasks', () => {
+    const saturday = normalizeDate(new Date('2025-01-04T12:00:00Z'));
+    const sunday = normalizeDate(new Date('2025-01-05T12:00:00Z'));
+    const monday = normalizeDate(new Date('2025-01-06T12:00:00Z'));
+
+    const tasks: Task[] = [
+      buildTask('1', monday),
+      buildTask('2', monday),
+      buildTask('3', monday),
+    ];
+
+    const customLimits = {
+      ...DEFAULT_CATEGORY_LIMITS,
+      Home: { weekdayMax: 5, weekendMax: 1 },
+    };
+
+    const assigned = assignStartDates(tasks, 4, customLimits, saturday);
+
+    const weekendAssignments = assigned.filter((task) => {
+      const key = getDateKey(task.startDate);
+      return key === getDateKey(saturday) || key === getDateKey(sunday);
+    });
+
+    const hoursByDay = weekendAssignments.reduce<Record<string, number>>(
+      (acc, task) => {
+        const key = getDateKey(task.startDate);
+        acc[key] = (acc[key] || 0) + (task.estimatedHours || 1);
+        return acc;
+      },
+      {},
+    );
+
+    expect(hoursByDay[getDateKey(saturday)] || 0).toBeLessThanOrEqual(1);
+    expect(hoursByDay[getDateKey(sunday)] || 0).toBeLessThanOrEqual(1);
+  });
+
+  it('uses weekday limits on weekdays', () => {
+    const monday = normalizeDate(new Date('2025-01-06T12:00:00Z'));
+    const tuesday = normalizeDate(new Date('2025-01-07T12:00:00Z'));
+
+    const tasks: Task[] = [
+      buildTask('weekday-1', tuesday),
+      buildTask('weekday-2', tuesday),
+      buildTask('weekday-3', tuesday),
+    ];
+
+    const customLimits = {
+      ...DEFAULT_CATEGORY_LIMITS,
+      Home: { weekdayMax: 2, weekendMax: 0 },
+    };
+
+    const assigned = assignStartDates(tasks, 4, customLimits, monday);
+
+    const mondayAssignments = assigned.filter(
+      (task) => getDateKey(task.startDate) === getDateKey(monday),
+    );
+
+    const totalMondayHours = mondayAssignments.reduce(
+      (sum, task) => sum + (task.estimatedHours || 1),
+      0,
+    );
+
+    expect(totalMondayHours).toBeLessThanOrEqual(2);
+    expect(totalMondayHours).toBeGreaterThan(0);
+  });
+
+  it('applies custom weekend limits from preferences', () => {
+    const saturday = normalizeDate(new Date('2025-01-04T12:00:00Z'));
+    const monday = normalizeDate(new Date('2025-01-06T12:00:00Z'));
+
+    const tasks: Task[] = Array.from({ length: 7 }, (_, index) =>
+      buildTask(`custom-${index}`, monday),
+    );
+
+    const customLimits = {
+      ...DEFAULT_CATEGORY_LIMITS,
+      Home: { weekdayMax: 4, weekendMax: 5 },
+    };
+
+    const assigned = assignStartDates(tasks, 10, customLimits, saturday);
+
+    const saturdayHours = assigned
+      .filter((task) => getDateKey(task.startDate) === getDateKey(saturday))
+      .reduce((sum, task) => sum + (task.estimatedHours || 1), 0);
+
+    expect(saturdayHours).toBe(5);
+  });
+
+  it('parses numeric string limits from persisted data', () => {
+    const normalized = normalizeCategoryLimits({
+      Home: {
+        weekdayMax: '6' as unknown as number,
+        weekendMax: '2' as unknown as number,
+      },
+    });
+
+    expect(normalized.Home.weekdayMax).toBe(6);
+    expect(normalized.Home.weekendMax).toBe(2);
   });
 });
