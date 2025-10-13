@@ -190,6 +190,26 @@ export const DEFAULT_DAILY_MAX_HOURS: DailyHourLimits = {
   weekend: 6,
 };
 
+const parseLimitValue = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') {
+      return undefined;
+    }
+
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+};
+
 export function normalizeCategoryLimits(
   limits: Record<string, Partial<CategoryHourLimit> | { max: number }> = {},
 ): Record<string, CategoryHourLimit> {
@@ -211,11 +231,21 @@ export function normalizeCategoryLimits(
 
     if (provided && typeof provided === 'object') {
       if ('weekdayMax' in provided || 'weekendMax' in provided) {
-        candidate.weekdayMax = provided.weekdayMax;
-        candidate.weekendMax = provided.weekendMax;
-      } else if ('max' in provided && typeof provided.max === 'number') {
-        candidate.weekdayMax = provided.max;
-        candidate.weekendMax = provided.max;
+        const weekdayCandidate = parseLimitValue(provided.weekdayMax);
+        const weekendCandidate = parseLimitValue(provided.weekendMax);
+
+        if (weekdayCandidate !== undefined) {
+          candidate.weekdayMax = weekdayCandidate;
+        }
+        if (weekendCandidate !== undefined) {
+          candidate.weekendMax = weekendCandidate;
+        }
+      } else if ('max' in provided) {
+        const maxCandidate = parseLimitValue(provided.max);
+        if (maxCandidate !== undefined) {
+          candidate.weekdayMax = maxCandidate;
+          candidate.weekendMax = maxCandidate;
+        }
       }
     }
 
