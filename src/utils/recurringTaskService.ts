@@ -3,7 +3,7 @@
 
 import { Task } from '../types/task';
 import { getNextRecurringDate, normalizeDate, getDateKey } from './dateUtils';
-import { addDays, isAfter } from 'date-fns';
+import { addDays, isAfter, isBefore } from 'date-fns';
 import logger from './logger';
 import { SCHEDULE_LOOKAHEAD_DAYS } from './scheduleConfig';
 
@@ -109,6 +109,196 @@ export function generateNextRecurringTask(task: Task): Task | null {
 }
 
 // Process all recurring tasks to ensure future instances exist
+function getRecurringSeriesGroupingKey(task: Task): string | null {
+  if (!task.isRecurring || !task.recurringInterval) {
+    return null;
+  }
+
+  const categoryId = task.category?.id ?? 'uncategorized';
+  let daysKey = '';
+
+  if (
+    task.recurringInterval === 'weekly' &&
+    Array.isArray(task.recurringDays) &&
+    task.recurringDays.length > 0
+  ) {
+    const sortedDays = [...task.recurringDays].sort((a, b) => a - b);
+    daysKey = sortedDays.join(',');
+  }
+
+  return `${task.name}__${categoryId}__${task.recurringInterval}__${daysKey}`;
+}
+
+function canTaskFollowSeries(previous: Task, candidate: Task): boolean {
+  if (!previous.isRecurring || !candidate.isRecurring) {
+    return false;
+  }
+
+  if (!previous.recurringInterval || !candidate.recurringInterval) {
+    return false;
+  }
+
+  if (previous.recurringInterval !== candidate.recurringInterval) {
+    return false;
+  }
+
+  const previousKey = getRecurringSeriesGroupingKey(previous);
+  const candidateKey = getRecurringSeriesGroupingKey(candidate);
+
+  if (!previousKey || !candidateKey || previousKey !== candidateKey) {
+    return false;
+  }
+
+  const previousDueDate = normalizeDate(previous.dueDate);
+  const candidateDueDate = normalizeDate(candidate.dueDate);
+
+  if (!isBefore(previousDueDate, candidateDueDate)) {
+    return false;
+  }
+
+  let nextDate = getNextRecurringDate(
+    previousDueDate,
+    previous.recurringInterval,
+    previous.recurringDays,
+  );
+
+  const candidateDateKey = getDateKey(candidateDueDate);
+
+  let guard = 0;
+  while (!isAfter(nextDate, candidateDueDate) && guard < 366) {
+    if (getDateKey(nextDate) === candidateDateKey) {
+      return true;
+    }
+
+    nextDate = getNextRecurringDate(
+      nextDate,
+      previous.recurringInterval,
+      previous.recurringDays,
+    );
+    guard += 1;
+  }
+
+  return false;
+}
+
+interface SeriesLane {
+  seriesId: string;
+  lastTask: Task;
+  taskIds: string[];
+}
+
+function ensureStableRecurringSeriesIdsInternal(tasks: Task[]): Task[] {
+  const groupingMap = new Map<string, Task[]>();
+
+  tasks.forEach((task) => {
+    const key = getRecurringSeriesGroupingKey(task);
+    if (!key) {
+      return;
+    }
+
+    if (!groupingMap.has(key)) {
+      groupingMap.set(key, []);
+    }
+
+    groupingMap.get(key)!.push(task);
+  });
+
+  if (groupingMap.size === 0) {
+    return tasks;
+  }
+
+  const updates = new Map<string, string>();
+
+  groupingMap.forEach((groupTasks) => {
+    const sorted = [...groupTasks].sort((a, b) => {
+      const dueDiff =
+        normalizeDate(a.dueDate).getTime() - normalizeDate(b.dueDate).getTime();
+
+      if (dueDiff !== 0) {
+        return dueDiff;
+      }
+
+      const createdA = a.createdAt ? a.createdAt.getTime() : 0;
+      const createdB = b.createdAt ? b.createdAt.getTime() : 0;
+
+      if (createdA !== createdB) {
+        return createdA - createdB;
+      }
+
+      return a.id.localeCompare(b.id);
+    });
+
+    const lanes: SeriesLane[] = [];
+
+    sorted.forEach((task) => {
+      if (!task.isRecurring || !task.recurringInterval) {
+        return;
+      }
+
+      let assignedLane = task.recurringSeriesId
+        ? lanes.find((lane) => lane.seriesId === task.recurringSeriesId)
+        : undefined;
+
+      if (!assignedLane) {
+        assignedLane = lanes.find((lane) => canTaskFollowSeries(lane.lastTask, task));
+      }
+
+      if (!assignedLane) {
+        const initialSeriesId = task.recurringSeriesId ?? task.id;
+        assignedLane = {
+          seriesId: initialSeriesId,
+          lastTask: task,
+          taskIds: [task.id],
+        };
+        lanes.push(assignedLane);
+
+        if (task.recurringSeriesId !== initialSeriesId) {
+          updates.set(task.id, initialSeriesId);
+        }
+
+        return;
+      }
+
+      if (
+        task.recurringSeriesId &&
+        assignedLane.seriesId !== task.recurringSeriesId
+      ) {
+        assignedLane.seriesId = task.recurringSeriesId;
+        assignedLane.taskIds.forEach((taskId) => {
+          updates.set(taskId, task.recurringSeriesId!);
+        });
+      }
+
+      assignedLane.lastTask = task;
+      assignedLane.taskIds.push(task.id);
+
+      if (task.recurringSeriesId !== assignedLane.seriesId) {
+        updates.set(task.id, assignedLane.seriesId);
+      }
+    });
+  });
+
+  if (updates.size === 0) {
+    return tasks;
+  }
+
+  return tasks.map((task) => {
+    const nextSeriesId = updates.get(task.id);
+    if (!nextSeriesId) {
+      return task;
+    }
+
+    return {
+      ...task,
+      recurringSeriesId: nextSeriesId,
+    };
+  });
+}
+
+export function ensureStableRecurringSeriesIds(tasks: Task[]): Task[] {
+  return ensureStableRecurringSeriesIdsInternal(tasks);
+}
+
 export function processRecurringTasks(
   tasks: Task[],
   options: RecurringTaskProcessingOptions = {},
@@ -119,8 +309,10 @@ export function processRecurringTasks(
   const today = normalizeDate(referenceDate);
   const lookAheadDate = addDays(today, lookAheadDays);
 
+  const tasksWithSeriesIds = ensureStableRecurringSeriesIdsInternal(tasks);
+
   // Ensure every recurring task in the list has a stable series identifier
-  const normalizedTasks = tasks.map((task) => {
+  const normalizedTasks = tasksWithSeriesIds.map((task) => {
     if (task.isRecurring && task.recurringInterval) {
       const seriesId = task.recurringSeriesId ?? task.id;
       if (task.recurringSeriesId !== seriesId) {
