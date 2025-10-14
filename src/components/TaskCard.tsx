@@ -27,9 +27,9 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
 
   return (
     <div
-      className={`bg-white rounded-lg border p-3 sm:p-4 shadow-card transition-all duration-600 
-        ${task.completed ? 'border-success-500 bg-success-50/30 opacity-60 translate-y-2' : isOverdue ? 'border-warning-500 bg-warning-50/20' : 'border-neutral-100'}
-        ${onEdit ? 'cursor-pointer hover:shadow-card-hover hover:scale-[1.015]' : ''}
+      className={`bg-white rounded-xl border p-2.5 sm:p-3 shadow-card transition-all duration-600
+        ${task.completed ? 'border-success-500 bg-success-50/30 opacity-60 translate-y-1.5' : isOverdue ? 'border-warning-500 bg-warning-50/20' : 'border-neutral-100'}
+        ${onEdit ? 'cursor-pointer hover:shadow-card-hover hover:scale-[1.01]' : ''}
       `}
       onClick={handleCardClick}
     >
@@ -53,9 +53,9 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
         {/* Main content */}
         <div className="flex-1 min-w-0">
           {/* Top row with task name and recurring icon */}
-          <div className="flex items-center gap-1 mb-1 sm:mb-2">
+          <div className="flex items-center gap-1.5 mb-1">
             <h3
-              className={`text-base sm:text-lg font-semibold truncate ${
+              className={`text-sm sm:text-base font-semibold truncate ${
                 task.completed
                   ? 'text-neutral-600 line-through'
                   : 'text-neutral-900'
@@ -68,43 +68,41 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
             )}
           </div>
 
-          {/* Metadata - stacked on mobile, horizontal on larger screens */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 text-xs sm:text-sm">
+          {/* Metadata - compact badges */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs leading-4">
             {/* Category */}
-            <div className="flex items-center gap-1 mb-1 sm:mb-0">
-              <span className="text-neutral-600">{task.category.name}</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100/80 text-neutral-600 px-2 py-0.5">
               <div
-                className="w-2 h-2 sm:w-3 sm:h-3 rounded-full"
+                className="w-2 h-2 rounded-full"
                 style={{ backgroundColor: task.category.color }}
               />
-            </div>
+              {task.category.name}
+            </span>
 
             {/* Due Date (with overdue/today coloring) */}
-            <div
-              className={`flex items-center gap-1 mb-1 sm:mb-0 ${
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${
                 isOverdue
-                  ? 'text-warning-500'
+                  ? 'bg-warning-100 text-warning-600'
                   : isDueToday
-                    ? 'text-primary-600'
-                    : 'text-neutral-600'
+                    ? 'bg-primary-50 text-primary-600'
+                    : 'bg-neutral-50 text-neutral-600'
               }`}
             >
-              <span>{formatTaskDate(task.dueDate)}</span>
-              <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <Calendar className="w-3 h-3 flex-shrink-0" />
+              {formatTaskDate(task.dueDate)}
               {isOverdue && (
-                <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
               )}
-            </div>
+            </span>
 
             {/* Estimated Time */}
-            <div className="flex items-center gap-1 text-neutral-600">
-              <span>
-                {task.estimatedHours === 1
-                  ? '1 hour'
-                  : `${task.estimatedHours} hours`}
-              </span>
-              <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-            </div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 text-neutral-600 px-2 py-0.5">
+              <Clock className="w-3 h-3 flex-shrink-0" />
+              {task.estimatedHours === 1
+                ? '1h'
+                : `${task.estimatedHours}h`}
+            </span>
           </div>
         </div>
       </div>
