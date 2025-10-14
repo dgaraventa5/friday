@@ -116,15 +116,17 @@ export function mergeStreakStates(
   }
 
   if (dateDiff < 0) {
-    // Local state already has a more recent completion - keep it
+    // Local state already has a more recent completion - keep it while preserving
+    // historical highs recorded in the incoming data.
+    const mergedLongestStreak = Math.max(
+      current.longestStreak,
+      incoming.longestStreak,
+    );
+
     return {
       ...current,
-      longestStreak: Math.max(
-        current.longestStreak,
-        incoming.longestStreak,
-      ),
-      milestoneCelebration:
-        current.milestoneCelebration ?? incoming.milestoneCelebration ?? null,
+      longestStreak: mergedLongestStreak,
+      milestoneCelebration: mergeMilestone(current, incoming),
     };
   }
 
