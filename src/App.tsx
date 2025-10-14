@@ -351,7 +351,7 @@ function AppContent() {
         />
       </ErrorBoundary>
 
-      <main className="flex-1 mx-auto px-2 py-4 w-full max-w-[600px] md:px-6 md:py-8 lg:max-w-[900px] overflow-hidden">
+      <main className="flex-1 mx-auto px-2 py-3 w-full max-w-[600px] md:px-6 md:py-8 lg:max-w-[900px] overflow-hidden">
         <div className="w-full h-full flex flex-col">
           {/* Main content: task list/cards, now full width on large screens */}
           <div className="w-full max-w-[600px] lg:max-w-[900px] mx-auto h-full">

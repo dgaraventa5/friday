@@ -115,49 +115,30 @@ export function TaskList({
 
   return (
     <PageLayout>
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg sm:text-xl font-bold text-neutral-900">
-          {formattedDate}
-        </h2>
-      </div>
+      <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base sm:text-xl font-bold text-neutral-900">
+            {formattedDate}
+          </h2>
+        </div>
 
-      <div className="mt-3 sm:mt-4 overflow-y-auto pb-4">
-        {/* Inline mode: show all tasks in order, completed and incomplete (Today's Focus) */}
-        {showCompletedInline ? (
-          <div className="space-y-2 sm:space-y-3">
-            {tasks.map((task) => (
+        <div className="mt-2 sm:mt-3 flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 sm:gap-3 pb-4 pr-1">
+          {/* Inline mode: show all tasks in order, completed and incomplete (Today's Focus) */}
+          {showCompletedInline ? (
+            tasks.map((task) => (
               <TaskCard
                 key={task.id}
                 task={task}
                 onToggleComplete={onToggleComplete}
                 onEdit={onEdit}
               />
-            ))}
-          </div>
-        ) : (
-          <>
-            {/* Incomplete Tasks (Full Schedule) */}
-            {incompleteTasks.length > 0 && (
-              <div className="space-y-2 sm:space-y-3">
-                {incompleteTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onToggleComplete={onToggleComplete}
-                    onEdit={onEdit}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Completed Tasks (Full Schedule) */}
-            {completedTasks.length > 0 && (
-              <div className="mt-4 sm:mt-6">
-                <h3 className="text-base sm:text-lg font-semibold text-neutral-600 mb-2 sm:mb-3">
-                  completed ({completedTasks.length})
-                </h3>
-                <div className="space-y-2 sm:space-y-3 opacity-75">
-                  {completedTasks.map((task) => (
+            ))
+          ) : (
+            <>
+              {/* Incomplete Tasks (Full Schedule) */}
+              {incompleteTasks.length > 0 && (
+                <div className="flex flex-col gap-2 sm:gap-3">
+                  {incompleteTasks.map((task) => (
                     <TaskCard
                       key={task.id}
                       task={task}
@@ -166,10 +147,29 @@ export function TaskList({
                     />
                   ))}
                 </div>
-              </div>
-            )}
-          </>
-        )}
+              )}
+
+              {/* Completed Tasks (Full Schedule) */}
+              {completedTasks.length > 0 && (
+                <div className="pt-2 sm:pt-3 border-t border-neutral-100">
+                  <h3 className="text-xs uppercase tracking-wide text-neutral-500 mb-1.5 sm:text-sm">
+                    completed ({completedTasks.length})
+                  </h3>
+                  <div className="flex flex-col gap-2 sm:gap-3 opacity-75">
+                    {completedTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onToggleComplete={onToggleComplete}
+                        onEdit={onEdit}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </PageLayout>
   );

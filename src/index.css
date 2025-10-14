@@ -18,12 +18,16 @@
   height: calc(100dvh - var(--header-height) - var(--bottom-nav-height));
   max-height: calc(100dvh - var(--header-height) - var(--bottom-nav-height));
   overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .schedule-page {
   height: calc(100dvh - var(--header-height) - var(--bottom-nav-height));
   max-height: calc(100dvh - var(--header-height) - var(--bottom-nav-height));
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 :root {
