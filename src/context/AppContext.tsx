@@ -30,6 +30,8 @@ import {
   saveOnboardingStatusToFirestore,
   loadOnboardingStatusFromFirestore,
   migrateLocalStorageToFirestore,
+  loadStreakFromFirestore,
+  saveStreakToFirestore,
 } from '../utils/firestoreService';
 import {
   ensureStableRecurringSeriesIds,
@@ -481,14 +483,28 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
         loadCategoriesFromFirestore(userId),
         loadPreferencesFromFirestore(userId),
         loadOnboardingStatusFromFirestore(userId),
+        loadStreakFromFirestore(userId),
       ])
-        .then(([tasks, categories, preferences, onboardingComplete]) => {
+        .then(([
+          tasks,
+          categories,
+          preferences,
+          onboardingComplete,
+          firestoreStreak,
+        ]) => {
           logger.log(
             `[AppContext] Loaded ${tasks.length} tasks, ${categories.length} categories from Firestore`,
           );
 
           const storedStreak = loadStreakState(userPrefix);
-          dispatch({ type: 'SET_STREAK', payload: storedStreak });
+          const initialStreak = firestoreStreak
+            ? mergeStreakStates(storedStreak, firestoreStreak)
+            : storedStreak;
+          dispatch({
+            type: 'SET_STREAK',
+            payload: initialStreak,
+            mode: 'replace',
+          });
 
           if (tasks.length > 0) {
             dispatch({ type: 'SET_TASKS', payload: tasks });
@@ -564,6 +580,9 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
             const localTasks = loadTasks(userPrefix);
             const localCategories = loadCategories(userPrefix);
             const localStreak = loadStreakState(userPrefix);
+            const mergedLocalStreak = firestoreStreak
+              ? mergeStreakStates(firestoreStreak, localStreak)
+              : localStreak;
 
             if (localTasks.length > 0 || localCategories.length > 0) {
               logger.log('[AppContext] Migrating local data to Firestore');
@@ -582,7 +601,17 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
               if (localCategories.length > 0) {
                 dispatch({ type: 'SET_CATEGORIES', payload: localCategories });
               }
-              dispatch({ type: 'SET_STREAK', payload: localStreak });
+              dispatch({
+                type: 'SET_STREAK',
+                payload: mergedLocalStreak,
+                mode: 'replace',
+              });
+              saveStreakToFirestore(userId, mergedLocalStreak).catch((error) => {
+                console.error(
+                  '[AppContext] Error saving migrated streak to Firestore:',
+                  error,
+                );
+              });
             }
           }
 
@@ -628,7 +657,11 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
               };
               dispatch({ type: 'UPDATE_PREFERENCES', payload: mergedPrefs });
             }
-            dispatch({ type: 'SET_STREAK', payload: loadedStreak });
+            dispatch({
+              type: 'SET_STREAK',
+              payload: loadedStreak,
+              mode: 'replace',
+            });
             if (onboardingComplete && !testMode) {
               dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
             } else if (testMode) {
@@ -729,6 +762,9 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
     if (userId && isDataLoaded) {
       const userPrefix = `user_${userId}_`;
       saveStreakState(state.streak, userPrefix);
+      saveStreakToFirestore(userId, state.streak).catch((error) => {
+        console.error('[AppContext] Error saving streak to Firestore:', error);
+      });
     }
   }, [state.streak, userId, isDataLoaded]);
 
