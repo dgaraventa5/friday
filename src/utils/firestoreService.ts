@@ -32,6 +32,8 @@ import {
   savePreferences,
   loadPreferences,
 } from './localStorage';
+import { StreakState } from '../types/streak';
+import { loadStreakState } from './streakUtils';
 
 // Detect if we're running on a mobile browser
 const isMobileBrowser = () => {
@@ -145,6 +147,7 @@ export const COLLECTIONS = {
   TASKS: 'tasks',
   CATEGORIES: 'categories',
   PREFERENCES: 'preferences',
+  STREAKS: 'streaks',
 };
 
 // Save tasks to Firestore
@@ -654,6 +657,100 @@ export async function loadOnboardingStatusFromFirestore(
   }
 }
 
+// Save streak state to Firestore for cross-device access
+export async function saveStreakToFirestore(
+  userId: string,
+  streak: StreakState,
+): Promise<void> {
+  try {
+    if (!isFirestoreAvailable) {
+      logger.log('[Firestore] Skipping streak save - Firestore unavailable');
+      return;
+    }
+
+    const streakRef = doc(db, COLLECTIONS.STREAKS, userId);
+    const payload = {
+      userId,
+      currentStreak: Number(streak.currentStreak) || 0,
+      longestStreak: Number(streak.longestStreak) || 0,
+      lastCompletedDate: streak.lastCompletedDate || null,
+      milestoneCelebration: streak.milestoneCelebration
+        ? {
+            streak: Number(streak.milestoneCelebration.streak) || 0,
+            achievedAt: streak.milestoneCelebration.achievedAt,
+          }
+        : null,
+      updatedAt: Timestamp.now(),
+    };
+
+    await setDoc(streakRef, payload, { merge: true });
+    logger.log('[Firestore] Saved streak to Firestore');
+  } catch (error) {
+    console.error('Error saving streak to Firestore:', error);
+    isFirestoreAvailable = false;
+  }
+}
+
+// Load streak state from Firestore
+export async function loadStreakFromFirestore(
+  userId: string,
+): Promise<StreakState | null> {
+  try {
+    if (!isFirestoreAvailable) {
+      logger.log(
+        '[Firestore] Falling back to local streak - Firestore unavailable',
+      );
+      return null;
+    }
+
+    const streakRef = doc(db, COLLECTIONS.STREAKS, userId);
+    const streakSnap = await getDoc(streakRef);
+
+    if (!streakSnap.exists()) {
+      logger.log('[Firestore] No streak document found for user');
+      return null;
+    }
+
+    const data = streakSnap.data();
+
+    const milestone = data.milestoneCelebration;
+    let milestoneCelebration: StreakState['milestoneCelebration'] = null;
+
+    if (milestone && typeof milestone === 'object') {
+      const milestoneStreak = Number(milestone.streak) || 0;
+      const achievedRaw = (milestone as Record<string, unknown>).achievedAt;
+      let achievedAt: string | null = null;
+
+      if (typeof achievedRaw === 'string') {
+        achievedAt = achievedRaw;
+      } else if (achievedRaw instanceof Timestamp) {
+        achievedAt = achievedRaw.toDate().toISOString();
+      }
+
+      if (milestoneStreak > 0 && achievedAt) {
+        milestoneCelebration = { streak: milestoneStreak, achievedAt };
+      }
+    }
+
+    const streakState: StreakState = {
+      currentStreak: Number(data.currentStreak) || 0,
+      longestStreak: Number(data.longestStreak) || 0,
+      lastCompletedDate:
+        typeof data.lastCompletedDate === 'string'
+          ? data.lastCompletedDate
+          : null,
+      milestoneCelebration,
+    };
+
+    logger.log('[Firestore] Loaded streak from Firestore');
+    return streakState;
+  } catch (error) {
+    console.error('Error loading streak from Firestore:', error);
+    isFirestoreAvailable = false;
+    return null;
+  }
+}
+
 // Migrate data from localStorage to Firestore
 export async function migrateLocalStorageToFirestore(
   userId: string,
@@ -686,6 +783,7 @@ export async function migrateLocalStorageToFirestore(
     );
     const localOnboardingComplete =
       localStorage.getItem(`${userPrefix}onboarding_complete`) === 'true';
+    const localStreak = loadStreakState(userPrefix);
 
     logger.log(`[Firestore] Found ${localTasks.length} tasks in localStorage`);
     logger.log(
@@ -738,6 +836,9 @@ export async function migrateLocalStorageToFirestore(
 
     logger.log('[Firestore] Saving onboarding status to Firestore');
     await saveOnboardingStatusToFirestore(userId, localOnboardingComplete);
+
+    logger.log('[Firestore] Saving streak to Firestore');
+    await saveStreakToFirestore(userId, localStreak);
 
     // Mark migration as completed
     localStorage.setItem(migrationKey, 'true');
