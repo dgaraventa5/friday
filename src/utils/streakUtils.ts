@@ -69,14 +69,14 @@ function normalizeStoredDate(dateString: string | null): Date | null {
 }
 
 function mergeMilestone(
-  current: StreakState,
-  incoming: StreakState,
+  preferred: StreakState,
+  fallback: StreakState,
 ): StreakState['milestoneCelebration'] {
-  if (incoming.milestoneCelebration) {
-    return incoming.milestoneCelebration;
+  if (preferred.milestoneCelebration) {
+    return preferred.milestoneCelebration;
   }
 
-  return current.milestoneCelebration;
+  return fallback.milestoneCelebration;
 }
 
 export function mergeStreakStates(
@@ -112,6 +112,7 @@ export function mergeStreakStates(
       ...current,
       ...incoming,
       longestStreak: Math.max(current.longestStreak, incoming.longestStreak),
+      milestoneCelebration: mergeMilestone(incoming, current),
     };
   }
 
@@ -136,7 +137,7 @@ export function mergeStreakStates(
     ...incoming,
     currentStreak: Math.max(current.currentStreak, incoming.currentStreak),
     longestStreak: Math.max(current.longestStreak, incoming.longestStreak),
-    milestoneCelebration: mergeMilestone(current, incoming),
+    milestoneCelebration: mergeMilestone(incoming, current),
   };
 }
 
