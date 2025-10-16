@@ -586,7 +586,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
 
             if (localTasks.length > 0 || localCategories.length > 0) {
               logger.log('[AppContext] Migrating local data to Firestore');
-              migrateLocalStorageToFirestore(userId)
+              migrateLocalStorageToFirestore(userId, mergedLocalStreak)
                 .then(() => {
                   logger.log('[AppContext] Migration complete');
                 })
@@ -605,12 +605,6 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
                 type: 'SET_STREAK',
                 payload: mergedLocalStreak,
                 mode: 'replace',
-              });
-              saveStreakToFirestore(userId, mergedLocalStreak).catch((error) => {
-                console.error(
-                  '[AppContext] Error saving migrated streak to Firestore:',
-                  error,
-                );
               });
             }
           }
