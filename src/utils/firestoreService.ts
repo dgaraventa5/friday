@@ -62,9 +62,10 @@ const isPrivateBrowsing = async (): Promise<boolean> => {
 };
 
 // Initialize Firestore with appropriate cache based on browser environment
-let db: Firestore;
+let db: Firestore | null = null;
 let persistenceType = 'unknown';
 let isFirestoreAvailable = true;
+let firestoreInitializationPromise: Promise<void> | null = null;
 
 const initializeFirestoreWithAppropriateCache = async () => {
   try {
@@ -121,6 +122,9 @@ const initializeFirestoreWithAppropriateCache = async () => {
         10,
       );
       logger.log(`[Firestore] Using emulator at ${host}:${port}`);
+      if (!db) {
+        throw new Error('Firestore instance unavailable for emulator connection');
+      }
       connectFirestoreEmulator(db, host, port);
     }
   } catch (error) {
@@ -135,12 +139,33 @@ const initializeFirestoreWithAppropriateCache = async () => {
   }
 };
 
-// Initialize Firestore
-(async () => {
-  await initializeFirestoreWithAppropriateCache();
-})().catch((error) => {
-  console.error('[Firestore] Error during initialization:', error);
-});
+const ensureFirestoreInitialized = async () => {
+  try {
+    if (!firestoreInitializationPromise) {
+      firestoreInitializationPromise = initializeFirestoreWithAppropriateCache();
+    }
+
+    await firestoreInitializationPromise;
+
+    if (!db) {
+      throw new Error('Firestore failed to initialize');
+    }
+  } catch (error) {
+    console.error('[Firestore] Error ensuring initialization:', error);
+    isFirestoreAvailable = false;
+    throw error;
+  }
+};
+
+const getDbOrThrow = async (): Promise<Firestore> => {
+  await ensureFirestoreInitialized();
+
+  if (!db) {
+    throw new Error('Firestore instance is not available');
+  }
+
+  return db;
+};
 
 // Collection names
 export const COLLECTIONS = {
@@ -162,11 +187,13 @@ export async function saveTasksToFirestore(
       return;
     }
 
+    const database = await getDbOrThrow();
+
     logger.log(`[Firestore] Saving ${tasks.length} tasks for user: ${userId}`);
-    const batch = writeBatch(db);
+    const batch = writeBatch(database);
 
     // Delete existing tasks first
-    const tasksRef = collection(db, COLLECTIONS.TASKS);
+    const tasksRef = collection(database, COLLECTIONS.TASKS);
     const q = query(tasksRef, where('userId', '==', userId));
     const querySnapshot = await getDocs(q);
 
@@ -176,7 +203,7 @@ export async function saveTasksToFirestore(
 
     // Add all tasks - make sure to include completed tasks
     tasks.forEach((task) => {
-      const taskRef = doc(collection(db, COLLECTIONS.TASKS));
+      const taskRef = doc(collection(database, COLLECTIONS.TASKS));
       const taskWithUser = {
         ...prepareForFirestore(task),
         userId,
@@ -220,12 +247,14 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
       return loadTasks(`user_${userId}_`);
     }
 
+    const database = await getDbOrThrow();
+
     logger.log(
       `[Firestore] Loading tasks for user: ${userId} with persistence type: ${persistenceType}`,
     );
 
     // Always try to get from server first
-    const tasksRef = collection(db, COLLECTIONS.TASKS);
+    const tasksRef = collection(database, COLLECTIONS.TASKS);
     const q = query(tasksRef, where('userId', '==', userId));
 
     try {
@@ -327,12 +356,14 @@ export async function saveCategoriesToFirestore(
       return;
     }
 
+    const database = await getDbOrThrow();
+
     logger.log(
       `[Firestore] Saving ${categories.length} categories for user: ${userId}`,
     );
 
     // Save all categories in a single document
-    const categoriesRef = doc(db, COLLECTIONS.CATEGORIES, userId);
+    const categoriesRef = doc(database, COLLECTIONS.CATEGORIES, userId);
     await setDoc(categoriesRef, {
       categories: categories.map(prepareForFirestore),
       userId,
@@ -367,8 +398,10 @@ export async function loadCategoriesFromFirestore(
       return loadCategories(`user_${userId}_`);
     }
 
+    const database = await getDbOrThrow();
+
     logger.log(`[Firestore] Loading categories for user: ${userId}`);
-    const categoriesRef = doc(db, COLLECTIONS.CATEGORIES, userId);
+    const categoriesRef = doc(database, COLLECTIONS.CATEGORIES, userId);
     const docSnap = await getDoc(categoriesRef);
 
     if (!docSnap.exists()) {
@@ -436,8 +469,10 @@ export async function savePreferencesToFirestore(
       return;
     }
 
+    const database = await getDbOrThrow();
+
     logger.log(`[Firestore] Saving preferences for user: ${userId}`);
-    const userPreferencesRef = doc(db, COLLECTIONS.PREFERENCES, userId);
+    const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
     await setDoc(userPreferencesRef, {
       ...prepareForFirestore(preferences),
       userId,
@@ -466,8 +501,10 @@ export async function loadPreferencesFromFirestore(
       return loadPreferences(`user_${userId}_`);
     }
 
+    const database = await getDbOrThrow();
+
     logger.log(`[Firestore] Loading preferences for user: ${userId}`);
-    const userPreferencesRef = doc(db, COLLECTIONS.PREFERENCES, userId);
+    const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
     const docSnap = await getDoc(userPreferencesRef);
 
     if (!docSnap.exists()) {
@@ -515,10 +552,12 @@ export async function saveOnboardingStatusToFirestore(
       return;
     }
 
+    const database = await getDbOrThrow();
+
     logger.log(
       `[Firestore] Saving onboarding status for user: ${userId}, value: ${completed}`,
     );
-    const userPreferencesRef = doc(db, COLLECTIONS.PREFERENCES, userId);
+    const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
     await setDoc(
       userPreferencesRef,
       {
@@ -572,8 +611,10 @@ export async function loadOnboardingStatusFromFirestore(
       return localStatus;
     }
 
+    const database = await getDbOrThrow();
+
     logger.log(`[Firestore] Loading onboarding status for user: ${userId}`);
-    const userPreferencesRef = doc(db, COLLECTIONS.PREFERENCES, userId);
+    const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
     const docSnap = await getDoc(userPreferencesRef);
 
     if (!docSnap.exists()) {
@@ -668,7 +709,9 @@ export async function saveStreakToFirestore(
       return;
     }
 
-    const streakRef = doc(db, COLLECTIONS.STREAKS, userId);
+    const database = await getDbOrThrow();
+
+    const streakRef = doc(database, COLLECTIONS.STREAKS, userId);
     const payload = {
       userId,
       currentStreak: Number(streak.currentStreak) || 0,
@@ -703,7 +746,9 @@ export async function loadStreakFromFirestore(
       return null;
     }
 
-    const streakRef = doc(db, COLLECTIONS.STREAKS, userId);
+    const database = await getDbOrThrow();
+
+    const streakRef = doc(database, COLLECTIONS.STREAKS, userId);
     const streakSnap = await getDoc(streakRef);
 
     if (!streakSnap.exists()) {
@@ -851,8 +896,8 @@ export async function migrateLocalStorageToFirestore(
   }
 }
 
-// Export db and helper functions for use in other components
-export { db, convertTimestamps, prepareForFirestore };
+// Export helper functions for use in other components
+export { getDbOrThrow as getFirestoreDb, convertTimestamps, prepareForFirestore };
 
 // Migrate tasks from localStorage to Firestore
 export async function migrateTasksToFirestore(userId: string): Promise<void> {
@@ -866,10 +911,11 @@ export async function migrateTasksToFirestore(userId: string): Promise<void> {
         `[Firestore] Migrating ${localTasks.length} tasks to Firestore`,
       );
 
-      const batch = writeBatch(db);
+      const database = await getDbOrThrow();
+      const batch = writeBatch(database);
 
       for (const task of localTasks) {
-        const taskRef = doc(collection(db, 'tasks'));
+        const taskRef = doc(collection(database, 'tasks'));
         const taskWithUser = {
           ...task,
           userId,
@@ -904,9 +950,11 @@ export async function migrateTasksToFirestore(userId: string): Promise<void> {
 // Fetch tasks from Firestore for a specific user
 export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
   try {
+    const database = await getDbOrThrow();
+
     logger.log(`[Firestore] Fetching tasks for user ${userId}`);
     const tasksQuery = query(
-      collection(db, 'tasks'),
+      collection(database, 'tasks'),
       where('userId', '==', userId),
     );
     const querySnapshot = await getDocs(tasksQuery);
@@ -937,10 +985,11 @@ export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
 // Disable network for offline mode
 export async function disableNetwork(): Promise<void> {
   try {
+    const database = await getDbOrThrow();
     const { disableNetwork: disableFirestoreNetwork } = await import(
       'firebase/firestore'
     );
-    await disableFirestoreNetwork(db);
+    await disableFirestoreNetwork(database);
     logger.log('[Firestore] Network disabled');
   } catch (error) {
     console.error('[Firestore] Failed to disable network:', error);
@@ -950,10 +999,11 @@ export async function disableNetwork(): Promise<void> {
 // Enable network to reconnect
 export async function enableNetwork(): Promise<void> {
   try {
+    const database = await getDbOrThrow();
     const { enableNetwork: enableFirestoreNetwork } = await import(
       'firebase/firestore'
     );
-    await enableFirestoreNetwork(db);
+    await enableFirestoreNetwork(database);
     logger.log('[Firestore] Network enabled');
   } catch (error) {
     console.error('[Firestore] Failed to enable network:', error);
@@ -979,11 +1029,12 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
 
   const attemptSync = async (): Promise<Task[]> => {
     try {
+      const database = await getDbOrThrow();
       // First ensure network is enabled and reset any connection state
       const { enableNetwork: enableFirestoreNetwork } = await import(
         'firebase/firestore'
       );
-      await enableFirestoreNetwork(db);
+      await enableFirestoreNetwork(database);
       logger.log('[Firestore] Network enabled for force sync');
 
       // Wait a moment to ensure connection is established
@@ -994,7 +1045,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
       // Fetch the latest tasks
       logger.log('[Firestore] Fetching latest data from server');
       const tasksQuery = query(
-        collection(db, COLLECTIONS.TASKS),
+        collection(database, COLLECTIONS.TASKS),
         where('userId', '==', userId),
       );
 
