@@ -1,6 +1,10 @@
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Task } from '../types/task';
-import { db, COLLECTIONS, convertTimestamps } from './firestoreService';
+import {
+  getFirestoreDb,
+  COLLECTIONS,
+  convertTimestamps,
+} from './firestoreService';
 import { saveTasks, loadTasks } from './localStorage';
 
 /**
@@ -13,8 +17,9 @@ export async function forceSyncTasksFromFirestore(
   console.log('[Firestore] Force syncing tasks for user:', userId);
 
   try {
+    const database = await getFirestoreDb();
     // Fetch the latest tasks from Firestore
-    const tasksRef = collection(db, COLLECTIONS.TASKS);
+    const tasksRef = collection(database, COLLECTIONS.TASKS);
     const q = query(tasksRef, where('userId', '==', userId));
     const querySnapshot = await getDocs(q);
 
