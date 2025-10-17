@@ -16,6 +16,7 @@ import {
   persistentSingleTabManager,
   memoryLocalCache,
   Firestore,
+  terminate,
 } from 'firebase/firestore';
 import { app } from './firebase';
 import logger from './logger';
@@ -65,6 +66,7 @@ const isPrivateBrowsing = async (): Promise<boolean> => {
 let db: Firestore | null = null;
 let persistenceType = 'unknown';
 let firestoreInitializationPromise: Promise<void> | null = null;
+let firestoreTerminationPromise: Promise<void> | null = null;
 
 const MAX_FIRESTORE_OPERATION_ATTEMPTS = 2;
 const MAX_WRITE_RETRY_ATTEMPTS = 5;
@@ -147,8 +149,24 @@ const resetFirestoreInitialization = () => {
   if (firestoreInitializationPromise) {
     logger.log('[Firestore] Resetting Firestore initialization state');
   }
+
+  const currentDb = db;
   firestoreInitializationPromise = null;
   db = null;
+
+  if (currentDb) {
+    const termination = terminate(currentDb)
+      .catch((error) => {
+        logger.warn('[Firestore] Failed to terminate Firestore instance', error);
+      })
+      .finally(() => {
+        if (firestoreTerminationPromise === termination) {
+          firestoreTerminationPromise = null;
+        }
+      });
+
+    firestoreTerminationPromise = termination;
+  }
 };
 
 if (typeof window !== 'undefined') {
@@ -279,6 +297,10 @@ const initializeFirestoreWithAppropriateCache = async () => {
 };
 
 const ensureFirestoreInitialized = async () => {
+  if (firestoreTerminationPromise) {
+    await firestoreTerminationPromise;
+  }
+
   if (!firestoreInitializationPromise) {
     firestoreInitializationPromise = initializeFirestoreWithAppropriateCache().catch(
       (error) => {
