@@ -64,8 +64,147 @@ const isPrivateBrowsing = async (): Promise<boolean> => {
 // Initialize Firestore with appropriate cache based on browser environment
 let db: Firestore | null = null;
 let persistenceType = 'unknown';
-let isFirestoreAvailable = true;
 let firestoreInitializationPromise: Promise<void> | null = null;
+
+const MAX_FIRESTORE_OPERATION_ATTEMPTS = 2;
+const MAX_WRITE_RETRY_ATTEMPTS = 5;
+const WRITE_RETRY_BASE_DELAY_MS = 2000;
+const WRITE_RETRY_MAX_DELAY_MS = 30000;
+
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+type PendingRetry = {
+  attempt: number;
+  operation: (attempt: number) => Promise<void>;
+};
+
+const pendingWriteRetries = new Map<string, PendingRetry>();
+
+const scheduleWriteRetry = (
+  description: string,
+  operation: (attempt: number) => Promise<void>,
+  attempt: number,
+) => {
+  if (attempt > MAX_WRITE_RETRY_ATTEMPTS) {
+    logger.error(
+      `[Firestore] Max retry attempts reached for ${description}`,
+    );
+    pendingWriteRetries.delete(description);
+    return;
+  }
+
+  const existing = pendingWriteRetries.get(description);
+  if (existing) {
+    if (existing.attempt <= attempt) {
+      pendingWriteRetries.set(description, {
+        attempt: existing.attempt,
+        operation,
+      });
+      logger.log(
+        `[Firestore] Updated pending retry for ${description} at attempt ${existing.attempt}`,
+      );
+      return;
+    }
+  }
+
+  const delay = Math.min(
+    WRITE_RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1),
+    WRITE_RETRY_MAX_DELAY_MS,
+  );
+
+  pendingWriteRetries.set(description, { attempt, operation });
+  logger.log(
+    `[Firestore] Scheduling retry ${attempt} for ${description} in ${delay}ms`,
+  );
+
+  setTimeout(async () => {
+    const current = pendingWriteRetries.get(description);
+    if (!current || current.attempt !== attempt) {
+      return;
+    }
+
+    try {
+      await current.operation(current.attempt);
+      pendingWriteRetries.delete(description);
+      logger.log(
+        `[Firestore] Retry ${current.attempt} for ${description} succeeded`,
+      );
+    } catch (error) {
+      pendingWriteRetries.delete(description);
+      logger.warn(
+        `[Firestore] Retry ${current.attempt} for ${description} failed`,
+        error,
+      );
+      scheduleWriteRetry(description, operation, current.attempt + 1);
+    }
+  }, delay);
+};
+
+const resetFirestoreInitialization = () => {
+  if (firestoreInitializationPromise) {
+    logger.log('[Firestore] Resetting Firestore initialization state');
+  }
+  firestoreInitializationPromise = null;
+  db = null;
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    const pending = Array.from(pendingWriteRetries.entries());
+    pendingWriteRetries.clear();
+
+    pending.forEach(([description, { attempt, operation }]) => {
+      logger.log(
+        `[Firestore] Online event detected, retrying ${description} (attempt ${attempt})`,
+      );
+
+      operation(attempt).catch((error) => {
+        logger.warn(
+          `[Firestore] Online retry failed for ${description}`,
+          error,
+        );
+        scheduleWriteRetry(description, operation, attempt + 1);
+      });
+    });
+  });
+}
+
+const tryFirestoreOperation = async <T>(
+  description: string,
+  operation: (database: Firestore) => Promise<T>,
+): Promise<T> => {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_FIRESTORE_OPERATION_ATTEMPTS; attempt++) {
+    try {
+      const database = await getDbOrThrow();
+      const result = await operation(database);
+      if (attempt > 1) {
+        logger.log(
+          `[Firestore] Operation "${description}" succeeded after retry ${attempt}`,
+        );
+      }
+      return result;
+    } catch (error) {
+      lastError = error;
+      logger.warn(
+        `[Firestore] Operation "${description}" failed on attempt ${attempt}`,
+        error,
+      );
+      resetFirestoreInitialization();
+      if (attempt < MAX_FIRESTORE_OPERATION_ATTEMPTS) {
+        await wait(WRITE_RETRY_BASE_DELAY_MS);
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(String(lastError ?? 'Unknown Firestore error'));
+};
 
 const initializeFirestoreWithAppropriateCache = async () => {
   try {
@@ -140,20 +279,21 @@ const initializeFirestoreWithAppropriateCache = async () => {
 };
 
 const ensureFirestoreInitialized = async () => {
-  try {
-    if (!firestoreInitializationPromise) {
-      firestoreInitializationPromise = initializeFirestoreWithAppropriateCache();
-    }
+  if (!firestoreInitializationPromise) {
+    firestoreInitializationPromise = initializeFirestoreWithAppropriateCache().catch(
+      (error) => {
+        logger.error('[Firestore] Initialization failure', error);
+        firestoreInitializationPromise = null;
+        throw error;
+      },
+    );
+  }
 
-    await firestoreInitializationPromise;
+  await firestoreInitializationPromise;
 
-    if (!db) {
-      throw new Error('Firestore failed to initialize');
-    }
-  } catch (error) {
-    console.error('[Firestore] Error ensuring initialization:', error);
-    isFirestoreAvailable = false;
-    throw error;
+  if (!db) {
+    firestoreInitializationPromise = null;
+    throw new Error('Firestore failed to initialize');
   }
 };
 
@@ -179,45 +319,47 @@ export const COLLECTIONS = {
 export async function saveTasksToFirestore(
   userId: string,
   tasks: Task[],
+  attempt = 1,
+  options: { queued?: boolean } = {},
 ): Promise<void> {
+  const { queued = false } = options;
+  const description = `save tasks for user ${userId}`;
+
   try {
-    if (!isFirestoreAvailable) {
-      logger.log('[Firestore] Falling back to localStorage for saving tasks');
-      saveTasks(tasks, `user_${userId}_`);
-      return;
-    }
+    await tryFirestoreOperation(description, async (database) => {
+      logger.log(
+        `[Firestore] Saving ${tasks.length} tasks for user: ${userId} (attempt ${attempt})`,
+      );
+      const batch = writeBatch(database);
 
-    const database = await getDbOrThrow();
+      // Delete existing tasks first
+      const tasksRef = collection(database, COLLECTIONS.TASKS);
+      const q = query(tasksRef, where('userId', '==', userId));
+      const querySnapshot = await getDocs(q);
 
-    logger.log(`[Firestore] Saving ${tasks.length} tasks for user: ${userId}`);
-    const batch = writeBatch(database);
+      querySnapshot.forEach((document) => {
+        batch.delete(document.ref);
+      });
 
-    // Delete existing tasks first
-    const tasksRef = collection(database, COLLECTIONS.TASKS);
-    const q = query(tasksRef, where('userId', '==', userId));
-    const querySnapshot = await getDocs(q);
+      // Add all tasks - make sure to include completed tasks
+      tasks.forEach((task) => {
+        const taskRef = doc(collection(database, COLLECTIONS.TASKS));
+        const taskWithUser = {
+          ...prepareForFirestore(task),
+          userId,
+        };
 
-    querySnapshot.forEach((document) => {
-      batch.delete(document.ref);
+        // Debug log for completed tasks
+        if (task.completed) {
+          logger.log('[Firestore] Saving completed task:', task.name, task.id);
+        }
+
+        batch.set(taskRef, taskWithUser);
+      });
+
+      await batch.commit();
     });
 
-    // Add all tasks - make sure to include completed tasks
-    tasks.forEach((task) => {
-      const taskRef = doc(collection(database, COLLECTIONS.TASKS));
-      const taskWithUser = {
-        ...prepareForFirestore(task),
-        userId,
-      };
-
-      // Debug log for completed tasks
-      if (task.completed) {
-        logger.log('[Firestore] Saving completed task:', task.name, task.id);
-      }
-
-      batch.set(taskRef, taskWithUser);
-    });
-
-    await batch.commit();
     logger.log(`[Firestore] Successfully saved ${tasks.length} tasks`);
 
     // Save a timestamp of last successful Firestore sync
@@ -227,118 +369,146 @@ export async function saveTasksToFirestore(
     );
   } catch (error) {
     console.error('Error saving tasks to Firestore:', error);
-    isFirestoreAvailable = false;
-    // Fallback to localStorage only if Firestore fails
-    saveTasks(tasks, `user_${userId}_`);
+
+    if (!queued) {
+      logger.log('[Firestore] Falling back to localStorage for saving tasks');
+      saveTasks(tasks, `user_${userId}_`);
+    }
+
+    if (attempt >= MAX_WRITE_RETRY_ATTEMPTS) {
+      logger.error(
+        `[Firestore] Giving up on ${description} after ${attempt} attempts`,
+        error,
+      );
+      return;
+    }
+
+    scheduleWriteRetry(
+      description,
+      (nextAttempt) =>
+        saveTasksToFirestore(userId, tasks, nextAttempt, { queued: true }),
+      attempt + 1,
+    );
   }
 }
 
 // Load tasks from Firestore
 export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
+  const userPrefix = `user_${userId}_`;
+
   try {
-    // Debug log to track user ID
     logger.log(
       '[Firestore DEBUG] loadTasksFromFirestore for user ID:',
       userId,
     );
 
-    if (!isFirestoreAvailable) {
-      logger.log('[Firestore] Falling back to localStorage for loading tasks');
-      return loadTasks(`user_${userId}_`);
-    }
+    return await tryFirestoreOperation(`load tasks for user ${userId}`, async (database) => {
+      logger.log(
+        `[Firestore] Loading tasks for user: ${userId} with persistence type: ${persistenceType}`,
+      );
 
-    const database = await getDbOrThrow();
-
-    logger.log(
-      `[Firestore] Loading tasks for user: ${userId} with persistence type: ${persistenceType}`,
-    );
-
-    // Always try to get from server first
-    const tasksRef = collection(database, COLLECTIONS.TASKS);
-    const q = query(tasksRef, where('userId', '==', userId));
-
-    try {
+      const tasksRef = collection(database, COLLECTIONS.TASKS);
+      const q = query(tasksRef, where('userId', '==', userId));
       const querySnapshot = await getDocs(q);
+
       logger.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
 
-      if (querySnapshot.size > 0) {
-        const tasks: Task[] = [];
-        const taskIds = new Set<string>(); // Track task IDs to prevent duplicates
+      if (querySnapshot.size === 0) {
+        const localTasks = loadTasks(userPrefix);
+        if (localTasks.length > 0) {
+          logger.log(
+            `[Firestore] No tasks in server; using ${localTasks.length} tasks from localStorage`,
+          );
 
-        querySnapshot.forEach((document) => {
-          const taskData = convertTimestamps(document.data());
-          // Remove userId field as it's not part of the Task interface
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { userId: _taskUserId, ...taskWithoutUserId } = taskData;
-
-          // Only add the task if we haven't seen this ID before
-          if (!taskIds.has(taskWithoutUserId.id)) {
-            taskIds.add(taskWithoutUserId.id);
-            tasks.push({
-              ...(taskWithoutUserId as Task),
-              recurringDays: normalizeRecurringDays(
-                (taskWithoutUserId as Task).recurringDays,
-              ),
-            });
-          } else {
-            logger.warn(
-              `[Firestore] Duplicate task ID detected: ${taskWithoutUserId.id}, skipping`,
+          if (
+            typeof navigator !== 'undefined' &&
+            typeof navigator.onLine === 'boolean' &&
+            navigator.onLine
+          ) {
+            scheduleWriteRetry(
+              `sync local tasks for user ${userId}`,
+              (nextAttempt) =>
+                saveTasksToFirestore(userId, localTasks, nextAttempt, {
+                  queued: true,
+                }),
+              1,
             );
           }
-        });
 
-        logger.log(
-          `[Firestore] Returning ${tasks.length} unique tasks (filtered from ${querySnapshot.size})`,
-        );
+          return localTasks;
+        }
 
-        // Update local storage as backup
-        saveTasks(tasks, `user_${userId}_`);
-        logger.log(
-          `[Firestore] Saved ${tasks.length} tasks to localStorage as backup`,
-        );
-
-        // Update last sync timestamp
-        localStorage.setItem(
-          `user_${userId}_last_firestore_sync`,
-          new Date().toISOString(),
-        );
-
-        return tasks;
+        logger.log('[Firestore] No tasks found in server or localStorage');
+        return [];
       }
-    } catch (serverError) {
-      logger.warn(
-        '[Firestore] Error fetching from server, will try local storage:',
-        serverError,
-      );
-    }
 
-    // If server fetch failed or returned no results, try local storage
-    const localTasks = loadTasks(`user_${userId}_`);
+      const tasks: Task[] = [];
+      const taskIds = new Set<string>();
+
+      querySnapshot.forEach((document) => {
+        const taskData = convertTimestamps(document.data());
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { userId: _taskUserId, ...taskWithoutUserId } = taskData;
+
+        if (!taskIds.has(taskWithoutUserId.id)) {
+          taskIds.add(taskWithoutUserId.id);
+          tasks.push({
+            ...(taskWithoutUserId as Task),
+            recurringDays: normalizeRecurringDays(
+              (taskWithoutUserId as Task).recurringDays,
+            ),
+          });
+        } else {
+          logger.warn(
+            `[Firestore] Duplicate task ID detected: ${taskWithoutUserId.id}, skipping`,
+          );
+        }
+      });
+
+      logger.log(
+        `[Firestore] Returning ${tasks.length} unique tasks (filtered from ${querySnapshot.size})`,
+      );
+
+      saveTasks(tasks, userPrefix);
+      logger.log(
+        `[Firestore] Saved ${tasks.length} tasks to localStorage as backup`,
+      );
+
+      localStorage.setItem(
+        `${userPrefix}last_firestore_sync`,
+        new Date().toISOString(),
+      );
+
+      return tasks;
+    });
+  } catch (error) {
+    console.error('Error loading tasks from Firestore:', error);
+    const localTasks = loadTasks(userPrefix);
+
     if (localTasks.length > 0) {
       logger.log(
-        `[Firestore] Using ${localTasks.length} tasks from localStorage`,
+        `[Firestore] Using ${localTasks.length} tasks from localStorage after error`,
       );
 
-      // Try to sync back to server when possible
-      if (navigator.onLine) {
-        saveTasksToFirestore(userId, localTasks).catch((err) =>
-          console.error(
-            '[Firestore] Error syncing local tasks to Firestore:',
-            err,
-          ),
+      if (
+        typeof navigator !== 'undefined' &&
+        typeof navigator.onLine === 'boolean' &&
+        navigator.onLine
+      ) {
+        scheduleWriteRetry(
+          `sync local tasks for user ${userId}`,
+          (nextAttempt) =>
+            saveTasksToFirestore(userId, localTasks, nextAttempt, {
+              queued: true,
+            }),
+          1,
         );
       }
 
       return localTasks;
     }
 
-    logger.log('[Firestore] No tasks found in server or localStorage');
     return [];
-  } catch (error) {
-    console.error('Error loading tasks from Firestore:', error);
-    isFirestoreAvailable = false;
-    // Fallback to localStorage
-    return loadTasks(`user_${userId}_`);
   }
 }
 
@@ -346,43 +516,59 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
 export async function saveCategoriesToFirestore(
   userId: string,
   categories: Category[],
+  attempt = 1,
+  options: { queued?: boolean } = {},
 ): Promise<void> {
+  const { queued = false } = options;
+  const description = `save categories for user ${userId}`;
+
   try {
-    if (!isFirestoreAvailable) {
+    await tryFirestoreOperation(description, async (database) => {
       logger.log(
-        '[Firestore] Falling back to localStorage for saving categories',
+        `[Firestore] Saving ${categories.length} categories for user: ${userId} (attempt ${attempt})`,
       );
-      saveCategories(categories, `user_${userId}_`);
-      return;
-    }
 
-    const database = await getDbOrThrow();
-
-    logger.log(
-      `[Firestore] Saving ${categories.length} categories for user: ${userId}`,
-    );
-
-    // Save all categories in a single document
-    const categoriesRef = doc(database, COLLECTIONS.CATEGORIES, userId);
-    await setDoc(categoriesRef, {
-      categories: categories.map(prepareForFirestore),
-      userId,
+      const categoriesRef = doc(database, COLLECTIONS.CATEGORIES, userId);
+      await setDoc(categoriesRef, {
+        categories: categories.map(prepareForFirestore),
+        userId,
+      });
     });
 
     logger.log(
       `[Firestore] Successfully saved ${categories.length} categories`,
     );
 
-    // Update last sync timestamp
     localStorage.setItem(
       `user_${userId}_categories_sync`,
       new Date().toISOString(),
     );
   } catch (error) {
     console.error('Error saving categories to Firestore:', error);
-    isFirestoreAvailable = false;
-    // Fallback to localStorage only if Firestore fails
-    saveCategories(categories, `user_${userId}_`);
+
+    if (!queued) {
+      logger.log(
+        '[Firestore] Falling back to localStorage for saving categories',
+      );
+      saveCategories(categories, `user_${userId}_`);
+    }
+
+    if (attempt >= MAX_WRITE_RETRY_ATTEMPTS) {
+      logger.error(
+        `[Firestore] Giving up on ${description} after ${attempt} attempts`,
+        error,
+      );
+      return;
+    }
+
+    scheduleWriteRetry(
+      description,
+      (nextAttempt) =>
+        saveCategoriesToFirestore(userId, categories, nextAttempt, {
+          queued: true,
+        }),
+      attempt + 1,
+    );
   }
 }
 
@@ -390,68 +576,91 @@ export async function saveCategoriesToFirestore(
 export async function loadCategoriesFromFirestore(
   userId: string,
 ): Promise<Category[]> {
+  const userPrefix = `user_${userId}_`;
+
   try {
-    if (!isFirestoreAvailable) {
-      logger.log(
-        '[Firestore] Falling back to localStorage for loading categories',
-      );
-      return loadCategories(`user_${userId}_`);
-    }
+    return await tryFirestoreOperation(
+      `load categories for user ${userId}`,
+      async (database) => {
+        logger.log(`[Firestore] Loading categories for user: ${userId}`);
+        const categoriesRef = doc(database, COLLECTIONS.CATEGORIES, userId);
+        const docSnap = await getDoc(categoriesRef);
 
-    const database = await getDbOrThrow();
+        if (!docSnap.exists()) {
+          logger.log('[Firestore] No categories found');
 
-    logger.log(`[Firestore] Loading categories for user: ${userId}`);
-    const categoriesRef = doc(database, COLLECTIONS.CATEGORIES, userId);
-    const docSnap = await getDoc(categoriesRef);
+          const localCategories = loadCategories(userPrefix);
+          if (localCategories.length > 0) {
+            logger.log(
+              `[Firestore] Using ${localCategories.length} categories from localStorage`,
+            );
 
-    if (!docSnap.exists()) {
-      logger.log('[Firestore] No categories found');
+            if (
+              typeof navigator !== 'undefined' &&
+              typeof navigator.onLine === 'boolean' &&
+              navigator.onLine
+            ) {
+              scheduleWriteRetry(
+                `sync local categories for user ${userId}`,
+                (nextAttempt) =>
+                  saveCategoriesToFirestore(userId, localCategories, nextAttempt, {
+                    queued: true,
+                  }),
+                1,
+              );
+            }
 
-      // Check if we have local categories to sync to Firestore
-      const localCategories = loadCategories(`user_${userId}_`);
-      if (localCategories.length > 0) {
-        logger.log(
-          `[Firestore] Using ${localCategories.length} categories from localStorage`,
+            return localCategories;
+          }
+
+          return [];
+        }
+
+        const data = docSnap.data();
+        const categoriesData = data.categories || [];
+
+        const categories: Category[] = Array.isArray(categoriesData)
+          ? categoriesData.map(
+              (category: DocumentData) => convertTimestamps(category) as Category,
+            )
+          : [];
+
+        logger.log(`[Firestore] Loaded ${categories.length} categories`);
+
+        localStorage.setItem(
+          `${userPrefix}categories_sync`,
+          new Date().toISOString(),
         );
 
-        // Sync local categories to Firestore for cross-device access
-        saveCategoriesToFirestore(userId, localCategories).catch((err) =>
-          console.error(
-            '[Firestore] Error syncing local categories to Firestore:',
-            err,
-          ),
-        );
-
-        return localCategories;
-      }
-
-      return [];
-    }
-
-    const data = docSnap.data();
-    const categoriesData = data.categories || [];
-
-    // Convert the categories array
-    const categories: Category[] = Array.isArray(categoriesData)
-      ? categoriesData.map(
-          (category: DocumentData) => convertTimestamps(category) as Category,
-        )
-      : [];
-
-    logger.log(`[Firestore] Loaded ${categories.length} categories`);
-
-    // Update last sync timestamp
-    localStorage.setItem(
-      `user_${userId}_categories_sync`,
-      new Date().toISOString(),
+        return categories;
+      },
     );
-
-    return categories;
   } catch (error) {
     console.error('Error loading categories from Firestore:', error);
-    isFirestoreAvailable = false;
-    // Fallback to localStorage
-    return loadCategories(`user_${userId}_`);
+    const localCategories = loadCategories(userPrefix);
+
+    if (localCategories.length > 0) {
+      logger.log(
+        `[Firestore] Using ${localCategories.length} categories from localStorage after error`,
+      );
+
+      if (
+        typeof navigator !== 'undefined' &&
+        typeof navigator.onLine === 'boolean' &&
+        navigator.onLine
+      ) {
+        scheduleWriteRetry(
+          `sync local categories for user ${userId}`,
+          (nextAttempt) =>
+            saveCategoriesToFirestore(userId, localCategories, nextAttempt, {
+              queued: true,
+            }),
+          1,
+        );
+      }
+    }
+
+    return localCategories;
   }
 }
 
@@ -459,33 +668,53 @@ export async function loadCategoriesFromFirestore(
 export async function savePreferencesToFirestore(
   userId: string,
   preferences: UserPreferences,
+  attempt = 1,
+  options: { queued?: boolean } = {},
 ): Promise<void> {
+  const { queued = false } = options;
+  const description = `save preferences for user ${userId}`;
+
   try {
-    if (!isFirestoreAvailable) {
+    await tryFirestoreOperation(description, async (database) => {
+      logger.log(
+        `[Firestore] Saving preferences for user: ${userId} (attempt ${attempt})`,
+      );
+      const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
+      await setDoc(userPreferencesRef, {
+        ...prepareForFirestore(preferences),
+        userId,
+      });
+    });
+
+    logger.log('[Firestore] Preferences saved successfully');
+
+    savePreferences(preferences, `user_${userId}_`);
+  } catch (error) {
+    console.error('Error saving preferences to Firestore:', error);
+
+    if (!queued) {
       logger.log(
         '[Firestore] Falling back to localStorage for saving preferences',
       );
       savePreferences(preferences, `user_${userId}_`);
+    }
+
+    if (attempt >= MAX_WRITE_RETRY_ATTEMPTS) {
+      logger.error(
+        `[Firestore] Giving up on ${description} after ${attempt} attempts`,
+        error,
+      );
       return;
     }
 
-    const database = await getDbOrThrow();
-
-    logger.log(`[Firestore] Saving preferences for user: ${userId}`);
-    const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
-    await setDoc(userPreferencesRef, {
-      ...prepareForFirestore(preferences),
-      userId,
-    });
-    logger.log('[Firestore] Preferences saved successfully');
-
-    // Also save to localStorage as backup
-    savePreferences(preferences, `user_${userId}_`);
-  } catch (error) {
-    console.error('Error saving preferences to Firestore:', error);
-    isFirestoreAvailable = false;
-    // Fallback to localStorage
-    savePreferences(preferences, `user_${userId}_`);
+    scheduleWriteRetry(
+      description,
+      (nextAttempt) =>
+        savePreferencesToFirestore(userId, preferences, nextAttempt, {
+          queued: true,
+        }),
+      attempt + 1,
+    );
   }
 }
 
@@ -493,42 +722,51 @@ export async function savePreferencesToFirestore(
 export async function loadPreferencesFromFirestore(
   userId: string,
 ): Promise<UserPreferences | null> {
+  const userPrefix = `user_${userId}_`;
+
   try {
-    if (!isFirestoreAvailable) {
-      logger.log(
-        '[Firestore] Falling back to localStorage for loading preferences',
-      );
-      return loadPreferences(`user_${userId}_`);
-    }
+    return await tryFirestoreOperation(
+      `load preferences for user ${userId}`,
+      async (database) => {
+        logger.log(`[Firestore] Loading preferences for user: ${userId}`);
+        const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
+        const docSnap = await getDoc(userPreferencesRef);
 
-    const database = await getDbOrThrow();
+        if (!docSnap.exists()) {
+          logger.log('[Firestore] No preferences found');
+          const localPreferences = loadPreferences(userPrefix);
+          if (localPreferences) {
+            logger.log('[Firestore] Using preferences from localStorage');
+            if (
+              typeof navigator !== 'undefined' &&
+              typeof navigator.onLine === 'boolean' &&
+              navigator.onLine
+            ) {
+              scheduleWriteRetry(
+                `sync local preferences for user ${userId}`,
+                (nextAttempt) =>
+                  savePreferencesToFirestore(userId, localPreferences, nextAttempt, {
+                    queued: true,
+                  }),
+                1,
+              );
+            }
+            return localPreferences;
+          }
+          return null;
+        }
 
-    logger.log(`[Firestore] Loading preferences for user: ${userId}`);
-    const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
-    const docSnap = await getDoc(userPreferencesRef);
-
-    if (!docSnap.exists()) {
-      logger.log('[Firestore] No preferences found');
-      // Try localStorage
-      const localPreferences = loadPreferences(`user_${userId}_`);
-      if (localPreferences) {
-        logger.log('[Firestore] Using preferences from localStorage');
-        return localPreferences;
-      }
-      return null;
-    }
-
-    const data = convertTimestamps(docSnap.data());
-    logger.log('[Firestore] Preferences found');
-    // Remove userId field as it's not part of the UserPreferences interface
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { userId: _prefUserId, ...preferencesWithoutUserId } = data;
-    return preferencesWithoutUserId as UserPreferences;
+        const data = convertTimestamps(docSnap.data());
+        logger.log('[Firestore] Preferences found');
+        savePreferences(data as UserPreferences, userPrefix);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { userId: _prefUserId, ...preferencesWithoutUserId } = data;
+        return preferencesWithoutUserId as UserPreferences;
+      },
+    );
   } catch (error) {
     console.error('Error loading preferences from Firestore:', error);
-    isFirestoreAvailable = false;
-    // Fallback to localStorage
-    return loadPreferences(`user_${userId}_`);
+    return loadPreferences(userPrefix);
   }
 }
 
@@ -536,62 +774,64 @@ export async function loadPreferencesFromFirestore(
 export async function saveOnboardingStatusToFirestore(
   userId: string,
   completed: boolean,
+  attempt = 1,
+  options: { queued?: boolean } = {},
 ): Promise<void> {
+  const { queued = false } = options;
+  const description = `save onboarding status for user ${userId}`;
+
   try {
-    if (!isFirestoreAvailable) {
+    await tryFirestoreOperation(description, async (database) => {
       logger.log(
-        '[Firestore] Falling back to localStorage for saving onboarding status',
+        `[Firestore] Saving onboarding status for user: ${userId}, value: ${completed} (attempt ${attempt})`,
       );
-      localStorage.setItem(
-        `user_${userId}_onboarding_complete`,
-        String(completed),
+      const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
+      await setDoc(
+        userPreferencesRef,
+        {
+          onboarding_complete: completed,
+          userId,
+          last_updated: Timestamp.now(),
+        },
+        { merge: true },
       );
-      logger.log(
-        `[Firestore] Saved onboarding status to localStorage: ${completed}`,
-      );
-      return;
-    }
+    });
 
-    const database = await getDbOrThrow();
+    logger.log('[Firestore] Onboarding status saved successfully to Firestore');
 
-    logger.log(
-      `[Firestore] Saving onboarding status for user: ${userId}, value: ${completed}`,
-    );
-    const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
-    await setDoc(
-      userPreferencesRef,
-      {
-        onboarding_complete: completed,
-        userId,
-        last_updated: Timestamp.now(),
-      },
-      { merge: true },
-    );
-    logger.log(
-      '[Firestore] Onboarding status saved successfully to Firestore',
-    );
-
-    // Update sync timestamp in localStorage
     localStorage.setItem(
       `user_${userId}_onboarding_sync`,
       new Date().toISOString(),
     );
-
-    // Keep a minimal copy in localStorage for quick access on page load
-    localStorage.setItem(
-      `user_${userId}_onboarding_complete`,
-      String(completed),
-    );
+    localStorage.setItem(`user_${userId}_onboarding_complete`, String(completed));
   } catch (error) {
     console.error('Error saving onboarding status to Firestore:', error);
-    isFirestoreAvailable = false;
-    // Fallback to localStorage
-    localStorage.setItem(
-      `user_${userId}_onboarding_complete`,
-      String(completed),
-    );
-    logger.log(
-      `[Firestore] Fallback saved onboarding status to localStorage: ${completed}`,
+
+    if (!queued) {
+      logger.log(
+        '[Firestore] Falling back to localStorage for saving onboarding status',
+      );
+      localStorage.setItem(`user_${userId}_onboarding_complete`, String(completed));
+      logger.log(
+        `[Firestore] Fallback saved onboarding status to localStorage: ${completed}`,
+      );
+    }
+
+    if (attempt >= MAX_WRITE_RETRY_ATTEMPTS) {
+      logger.error(
+        `[Firestore] Giving up on ${description} after ${attempt} attempts`,
+        error,
+      );
+      return;
+    }
+
+    scheduleWriteRetry(
+      description,
+      (nextAttempt) =>
+        saveOnboardingStatusToFirestore(userId, completed, nextAttempt, {
+          queued: true,
+        }),
+      attempt + 1,
     );
   }
 }
@@ -600,100 +840,101 @@ export async function saveOnboardingStatusToFirestore(
 export async function loadOnboardingStatusFromFirestore(
   userId: string,
 ): Promise<boolean> {
+  const userPrefix = `user_${userId}_`;
+
   try {
-    if (!isFirestoreAvailable) {
-      logger.log(
-        '[Firestore] Falling back to localStorage for loading onboarding status',
-      );
-      const localStatus =
-        localStorage.getItem(`user_${userId}_onboarding_complete`) === 'true';
-      logger.log(`[Firestore] Local onboarding status: ${localStatus}`);
-      return localStatus;
-    }
+    return await tryFirestoreOperation(
+      `load onboarding status for user ${userId}`,
+      async (database) => {
+        logger.log(`[Firestore] Loading onboarding status for user: ${userId}`);
+        const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
+        const docSnap = await getDoc(userPreferencesRef);
 
-    const database = await getDbOrThrow();
+        if (!docSnap.exists()) {
+          logger.log(
+            '[Firestore] No preferences document found, checking localStorage',
+          );
+          const localOnboardingComplete =
+            localStorage.getItem(`${userPrefix}onboarding_complete`) === 'true';
+          logger.log(
+            `[Firestore] Using onboarding status from localStorage: ${localOnboardingComplete}`,
+          );
 
-    logger.log(`[Firestore] Loading onboarding status for user: ${userId}`);
-    const userPreferencesRef = doc(database, COLLECTIONS.PREFERENCES, userId);
-    const docSnap = await getDoc(userPreferencesRef);
+          if (
+            typeof navigator !== 'undefined' &&
+            typeof navigator.onLine === 'boolean' &&
+            navigator.onLine
+          ) {
+            scheduleWriteRetry(
+              `sync local onboarding status for user ${userId}`,
+              (nextAttempt) =>
+                saveOnboardingStatusToFirestore(
+                  userId,
+                  localOnboardingComplete,
+                  nextAttempt,
+                  { queued: true },
+                ),
+              1,
+            );
+          }
 
-    if (!docSnap.exists()) {
-      logger.log(
-        '[Firestore] No preferences document found, checking localStorage',
-      );
-      // Try localStorage
-      const localOnboardingComplete =
-        localStorage.getItem(`user_${userId}_onboarding_complete`) === 'true';
-      logger.log(
-        `[Firestore] Using onboarding status from localStorage: ${localOnboardingComplete}`,
-      );
+          return localOnboardingComplete;
+        }
 
-      // If we have a local value, save it to Firestore for cross-device access
-      if (localOnboardingComplete) {
-        saveOnboardingStatusToFirestore(userId, localOnboardingComplete).catch(
-          (err) =>
-            console.error(
-              '[Firestore] Error syncing local onboarding status to Firestore:',
-              err,
-            ),
+        const data = docSnap.data();
+        if (data.onboarding_complete !== undefined) {
+          const onboardingComplete = data.onboarding_complete === true;
+          logger.log(
+            `[Firestore] Onboarding status found in preferences: ${onboardingComplete}`,
+          );
+
+          localStorage.setItem(
+            `${userPrefix}onboarding_complete`,
+            String(onboardingComplete),
+          );
+          localStorage.setItem(
+            `${userPrefix}onboarding_sync`,
+            new Date().toISOString(),
+          );
+
+          return onboardingComplete;
+        }
+
+        logger.log(
+          '[Firestore] No onboarding status in preferences, checking localStorage',
         );
-      }
-
-      return localOnboardingComplete;
-    }
-
-    const data = docSnap.data();
-    // Check if onboarding_complete exists and is a boolean
-    if (data.onboarding_complete !== undefined) {
-      const onboardingComplete = data.onboarding_complete === true;
-      logger.log(
-        `[Firestore] Onboarding status found in preferences: ${onboardingComplete}`,
-      );
-
-      // Update local copy for quick access
-      localStorage.setItem(
-        `user_${userId}_onboarding_complete`,
-        String(onboardingComplete),
-      );
-      localStorage.setItem(
-        `user_${userId}_onboarding_sync`,
-        new Date().toISOString(),
-      );
-
-      return onboardingComplete;
-    } else {
-      logger.log(
-        '[Firestore] No onboarding status in preferences, checking localStorage',
-      );
-      // If not in Firestore, try localStorage
-      const localOnboardingComplete =
-        localStorage.getItem(`user_${userId}_onboarding_complete`) === 'true';
-      logger.log(
-        `[Firestore] Using onboarding status from localStorage: ${localOnboardingComplete}`,
-      );
-
-      // Sync to Firestore if we have a local value
-      if (localOnboardingComplete) {
-        saveOnboardingStatusToFirestore(userId, localOnboardingComplete).catch(
-          (err) =>
-            console.error(
-              '[Firestore] Error syncing local onboarding status to Firestore:',
-              err,
-            ),
+        const localOnboardingComplete =
+          localStorage.getItem(`${userPrefix}onboarding_complete`) === 'true';
+        logger.log(
+          `[Firestore] Using onboarding status from localStorage: ${localOnboardingComplete}`,
         );
-      }
 
-      return localOnboardingComplete;
-    }
+        if (
+          typeof navigator !== 'undefined' &&
+          typeof navigator.onLine === 'boolean' &&
+          navigator.onLine
+        ) {
+          scheduleWriteRetry(
+            `sync local onboarding status for user ${userId}`,
+            (nextAttempt) =>
+              saveOnboardingStatusToFirestore(
+                userId,
+                localOnboardingComplete,
+                nextAttempt,
+                { queued: true },
+              ),
+            1,
+          );
+        }
+
+        return localOnboardingComplete;
+      },
+    );
   } catch (error) {
     console.error('Error loading onboarding status from Firestore:', error);
-    isFirestoreAvailable = false;
-    // Fallback to localStorage
     const localStatus =
-      localStorage.getItem(`user_${userId}_onboarding_complete`) === 'true';
-    logger.log(
-      `[Firestore] Error fallback, using localStorage: ${localStatus}`,
-    );
+      localStorage.getItem(`${userPrefix}onboarding_complete`) === 'true';
+    logger.log(`[Firestore] Error fallback, using localStorage: ${localStatus}`);
     return localStatus;
   }
 }
@@ -702,35 +943,57 @@ export async function loadOnboardingStatusFromFirestore(
 export async function saveStreakToFirestore(
   userId: string,
   streak: StreakState,
+  attempt = 1,
+  options: { queued?: boolean } = {},
 ): Promise<void> {
+  const { queued = false } = options;
+  const description = `save streak for user ${userId}`;
+
   try {
-    if (!isFirestoreAvailable) {
-      logger.log('[Firestore] Skipping streak save - Firestore unavailable');
-      return;
-    }
+    await tryFirestoreOperation(description, async (database) => {
+      const streakRef = doc(database, COLLECTIONS.STREAKS, userId);
+      const payload = {
+        userId,
+        currentStreak: Number(streak.currentStreak) || 0,
+        longestStreak: Number(streak.longestStreak) || 0,
+        lastCompletedDate: streak.lastCompletedDate || null,
+        milestoneCelebration: streak.milestoneCelebration
+          ? {
+              streak: Number(streak.milestoneCelebration.streak) || 0,
+              achievedAt: streak.milestoneCelebration.achievedAt,
+            }
+          : null,
+        updatedAt: Timestamp.now(),
+      };
 
-    const database = await getDbOrThrow();
+      logger.log(
+        `[Firestore] Saving streak for user ${userId} (attempt ${attempt})`,
+      );
+      await setDoc(streakRef, payload, { merge: true });
+    });
 
-    const streakRef = doc(database, COLLECTIONS.STREAKS, userId);
-    const payload = {
-      userId,
-      currentStreak: Number(streak.currentStreak) || 0,
-      longestStreak: Number(streak.longestStreak) || 0,
-      lastCompletedDate: streak.lastCompletedDate || null,
-      milestoneCelebration: streak.milestoneCelebration
-        ? {
-            streak: Number(streak.milestoneCelebration.streak) || 0,
-            achievedAt: streak.milestoneCelebration.achievedAt,
-          }
-        : null,
-      updatedAt: Timestamp.now(),
-    };
-
-    await setDoc(streakRef, payload, { merge: true });
     logger.log('[Firestore] Saved streak to Firestore');
   } catch (error) {
     console.error('Error saving streak to Firestore:', error);
-    isFirestoreAvailable = false;
+
+    if (attempt >= MAX_WRITE_RETRY_ATTEMPTS) {
+      logger.error(
+        `[Firestore] Giving up on ${description} after ${attempt} attempts`,
+        error,
+      );
+      return;
+    }
+
+    if (!queued) {
+      logger.log('[Firestore] Queuing streak save for retry');
+    }
+
+    scheduleWriteRetry(
+      description,
+      (nextAttempt) =>
+        saveStreakToFirestore(userId, streak, nextAttempt, { queued: true }),
+      attempt + 1,
+    );
   }
 }
 
@@ -739,59 +1002,54 @@ export async function loadStreakFromFirestore(
   userId: string,
 ): Promise<StreakState | null> {
   try {
-    if (!isFirestoreAvailable) {
-      logger.log(
-        '[Firestore] Falling back to local streak - Firestore unavailable',
-      );
-      return null;
-    }
+    return await tryFirestoreOperation(
+      `load streak for user ${userId}`,
+      async (database) => {
+        const streakRef = doc(database, COLLECTIONS.STREAKS, userId);
+        const streakSnap = await getDoc(streakRef);
 
-    const database = await getDbOrThrow();
+        if (!streakSnap.exists()) {
+          logger.log('[Firestore] No streak document found for user');
+          return null;
+        }
 
-    const streakRef = doc(database, COLLECTIONS.STREAKS, userId);
-    const streakSnap = await getDoc(streakRef);
+        const data = streakSnap.data();
 
-    if (!streakSnap.exists()) {
-      logger.log('[Firestore] No streak document found for user');
-      return null;
-    }
+        const milestone = data.milestoneCelebration;
+        let milestoneCelebration: StreakState['milestoneCelebration'] = null;
 
-    const data = streakSnap.data();
+        if (milestone && typeof milestone === 'object') {
+          const milestoneStreak = Number(milestone.streak) || 0;
+          const achievedRaw = (milestone as Record<string, unknown>).achievedAt;
+          let achievedAt: string | null = null;
 
-    const milestone = data.milestoneCelebration;
-    let milestoneCelebration: StreakState['milestoneCelebration'] = null;
+          if (typeof achievedRaw === 'string') {
+            achievedAt = achievedRaw;
+          } else if (achievedRaw instanceof Timestamp) {
+            achievedAt = achievedRaw.toDate().toISOString();
+          }
 
-    if (milestone && typeof milestone === 'object') {
-      const milestoneStreak = Number(milestone.streak) || 0;
-      const achievedRaw = (milestone as Record<string, unknown>).achievedAt;
-      let achievedAt: string | null = null;
+          if (milestoneStreak > 0 && achievedAt) {
+            milestoneCelebration = { streak: milestoneStreak, achievedAt };
+          }
+        }
 
-      if (typeof achievedRaw === 'string') {
-        achievedAt = achievedRaw;
-      } else if (achievedRaw instanceof Timestamp) {
-        achievedAt = achievedRaw.toDate().toISOString();
-      }
+        const streakState: StreakState = {
+          currentStreak: Number(data.currentStreak) || 0,
+          longestStreak: Number(data.longestStreak) || 0,
+          lastCompletedDate:
+            typeof data.lastCompletedDate === 'string'
+              ? data.lastCompletedDate
+              : null,
+          milestoneCelebration,
+        };
 
-      if (milestoneStreak > 0 && achievedAt) {
-        milestoneCelebration = { streak: milestoneStreak, achievedAt };
-      }
-    }
-
-    const streakState: StreakState = {
-      currentStreak: Number(data.currentStreak) || 0,
-      longestStreak: Number(data.longestStreak) || 0,
-      lastCompletedDate:
-        typeof data.lastCompletedDate === 'string'
-          ? data.lastCompletedDate
-          : null,
-      milestoneCelebration,
-    };
-
-    logger.log('[Firestore] Loaded streak from Firestore');
-    return streakState;
+        logger.log('[Firestore] Loaded streak from Firestore');
+        return streakState;
+      },
+    );
   } catch (error) {
     console.error('Error loading streak from Firestore:', error);
-    isFirestoreAvailable = false;
     return null;
   }
 }
@@ -802,12 +1060,14 @@ export async function migrateLocalStorageToFirestore(
   streakOverride?: StreakState,
 ): Promise<void> {
   try {
-    if (!isFirestoreAvailable) {
-      logger.log('[Firestore] Firestore not available, skipping migration');
-      return;
-    }
-
     logger.log(`[Firestore] Starting migration for user: ${userId}`);
+    await tryFirestoreOperation(
+      `verify Firestore before migration for ${userId}`,
+      async () => {
+        logger.log('[Firestore] Firestore reachable for migration');
+      },
+    );
+
     const userPrefix = `user_${userId}_`;
 
     // Check if we've already migrated
@@ -893,7 +1153,6 @@ export async function migrateLocalStorageToFirestore(
     logger.log('[Firestore] Migration completed successfully');
   } catch (error) {
     console.error('[Firestore] Error during migration:', error);
-    isFirestoreAvailable = false;
     // No need to throw, we'll just keep using localStorage
   }
 }
