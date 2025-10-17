@@ -485,7 +485,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
         loadOnboardingStatusFromFirestore(userId),
         loadStreakFromFirestore(userId),
       ])
-        .then(([
+        .then(async ([
           tasks,
           categories,
           preferences,
@@ -576,23 +576,22 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
           }
 
           // If no data in Firestore but we have local data, migrate it
+          let pendingMigration: Promise<void> | undefined;
+
           if (tasks.length === 0 && categories.length === 0) {
             const localTasks = loadTasks(userPrefix);
             const localCategories = loadCategories(userPrefix);
             const localStreak = loadStreakState(userPrefix);
             const mergedLocalStreak = firestoreStreak
-              ? mergeStreakStates(firestoreStreak, localStreak)
+              ? mergeStreakStates(localStreak, firestoreStreak)
               : localStreak;
 
             if (localTasks.length > 0 || localCategories.length > 0) {
               logger.log('[AppContext] Migrating local data to Firestore');
-              migrateLocalStorageToFirestore(userId)
-                .then(() => {
-                  logger.log('[AppContext] Migration complete');
-                })
-                .catch((error) => {
-                  console.error('[AppContext] Migration failed:', error);
-                });
+              pendingMigration = migrateLocalStorageToFirestore(
+                userId,
+                mergedLocalStreak,
+              );
 
               // Use local data for now
               if (localTasks.length > 0) {
@@ -606,12 +605,15 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
                 payload: mergedLocalStreak,
                 mode: 'replace',
               });
-              saveStreakToFirestore(userId, mergedLocalStreak).catch((error) => {
-                console.error(
-                  '[AppContext] Error saving migrated streak to Firestore:',
-                  error,
-                );
-              });
+            }
+          }
+
+          if (pendingMigration) {
+            try {
+              await pendingMigration;
+              logger.log('[AppContext] Migration complete');
+            } catch (error) {
+              console.error('[AppContext] Migration failed:', error);
             }
           }
 

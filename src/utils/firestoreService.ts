@@ -799,6 +799,7 @@ export async function loadStreakFromFirestore(
 // Migrate data from localStorage to Firestore
 export async function migrateLocalStorageToFirestore(
   userId: string,
+  streakOverride?: StreakState,
 ): Promise<void> {
   try {
     if (!isFirestoreAvailable) {
@@ -882,8 +883,9 @@ export async function migrateLocalStorageToFirestore(
     logger.log('[Firestore] Saving onboarding status to Firestore');
     await saveOnboardingStatusToFirestore(userId, localOnboardingComplete);
 
+    const streakToPersist = streakOverride ?? localStreak;
     logger.log('[Firestore] Saving streak to Firestore');
-    await saveStreakToFirestore(userId, localStreak);
+    await saveStreakToFirestore(userId, streakToPersist);
 
     // Mark migration as completed
     localStorage.setItem(migrationKey, 'true');
