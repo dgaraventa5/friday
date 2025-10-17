@@ -1055,9 +1055,14 @@ export async function loadStreakFromFirestore(
 }
 
 // Migrate data from localStorage to Firestore
+type MigrationOptions = {
+  includeCategories?: boolean;
+};
+
 export async function migrateLocalStorageToFirestore(
   userId: string,
   streakOverride?: StreakState,
+  options: MigrationOptions = {},
 ): Promise<void> {
   try {
     logger.log(`[Firestore] Starting migration for user: ${userId}`);
@@ -1125,11 +1130,15 @@ export async function migrateLocalStorageToFirestore(
       await saveTasksToFirestore(userId, parsedTasks as Task[]);
     }
 
-    if (localCategories.length > 0) {
+    const includeCategories = options.includeCategories ?? true;
+
+    if (includeCategories && localCategories.length > 0) {
       logger.log(
         `[Firestore] Saving ${localCategories.length} categories to Firestore`,
       );
       await saveCategoriesToFirestore(userId, localCategories as Category[]);
+    } else if (!includeCategories) {
+      logger.log('[Firestore] Skipping category migration per options');
     }
 
     if (localPreferences) {
