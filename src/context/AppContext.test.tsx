@@ -124,6 +124,8 @@ describe('AppProvider task migration', () => {
     );
 
     expect(mockMigrateLocalStorageToFirestore).toHaveBeenCalledTimes(1);
+    const migrationCall = mockMigrateLocalStorageToFirestore.mock.calls[0];
+    expect(migrationCall[2]).toEqual({ includeCategories: false });
     expect(mockLoadTasksFromFirestore).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('category-count').textContent).toBe('1');
   });
