@@ -578,26 +578,36 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
           // If no data in Firestore but we have local data, migrate it
           let pendingMigration: Promise<void> | undefined;
 
-          if (tasks.length === 0 && categories.length === 0) {
-            const localTasks = loadTasks(userPrefix);
-            const localCategories = loadCategories(userPrefix);
+          const shouldLoadLocalTasks = tasks.length === 0;
+          const shouldLoadLocalCategories = categories.length === 0;
+
+          if (shouldLoadLocalTasks || shouldLoadLocalCategories) {
+            const localTasks = shouldLoadLocalTasks
+              ? loadTasks(userPrefix)
+              : [];
+            const localCategories = shouldLoadLocalCategories
+              ? loadCategories(userPrefix)
+              : [];
             const localStreak = loadStreakState(userPrefix);
             const mergedLocalStreak = firestoreStreak
               ? mergeStreakStates(localStreak, firestoreStreak)
               : localStreak;
 
-            if (localTasks.length > 0 || localCategories.length > 0) {
+            const hasLocalTasks = shouldLoadLocalTasks && localTasks.length > 0;
+            const hasLocalCategories =
+              shouldLoadLocalCategories && localCategories.length > 0;
+
+            if (hasLocalTasks || hasLocalCategories) {
               logger.log('[AppContext] Migrating local data to Firestore');
               pendingMigration = migrateLocalStorageToFirestore(
                 userId,
                 mergedLocalStreak,
               );
 
-              // Use local data for now
-              if (localTasks.length > 0) {
+              if (hasLocalTasks) {
                 dispatch({ type: 'SET_TASKS', payload: localTasks });
               }
-              if (localCategories.length > 0) {
+              if (hasLocalCategories) {
                 dispatch({ type: 'SET_CATEGORIES', payload: localCategories });
               }
               dispatch({
