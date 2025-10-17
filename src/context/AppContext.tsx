@@ -583,7 +583,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
             const localCategories = loadCategories(userPrefix);
             const localStreak = loadStreakState(userPrefix);
             const mergedLocalStreak = firestoreStreak
-              ? mergeStreakStates(firestoreStreak, localStreak)
+              ? mergeStreakStates(localStreak, firestoreStreak)
               : localStreak;
 
             if (localTasks.length > 0 || localCategories.length > 0) {
