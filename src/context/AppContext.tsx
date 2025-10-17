@@ -602,6 +602,9 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
               pendingMigration = migrateLocalStorageToFirestore(
                 userId,
                 mergedLocalStreak,
+                {
+                  includeCategories: shouldLoadLocalCategories,
+                },
               );
 
               if (hasLocalTasks) {
