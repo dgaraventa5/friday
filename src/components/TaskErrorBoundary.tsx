@@ -1,5 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from './Button';
+import logger from '../utils/logger';
 
 interface Props {
   children: ReactNode;
@@ -19,7 +20,7 @@ export class TaskErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Task component error:', error, errorInfo);
+    logger.error('Task component error:', error, errorInfo);
   }
 
   public render() {

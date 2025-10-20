@@ -10,30 +10,18 @@ import {
   Auth,
 } from 'firebase/auth';
 
-// Debug: Log environment variables
-console.log('Firebase environment variables:');
-console.log('API Key exists:', !!import.meta.env.VITE_FIREBASE_API_KEY);
-console.log(
-  'API Key value:',
-  import.meta.env.VITE_FIREBASE_API_KEY
-    ? 'First few chars: ' +
-        import.meta.env.VITE_FIREBASE_API_KEY.substring(0, 5) +
-        '...'
-    : 'undefined',
-);
-console.log('Auth Domain exists:', !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
-console.log('Auth Domain value:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
-console.log('Project ID exists:', !!import.meta.env.VITE_FIREBASE_PROJECT_ID);
-console.log('Project ID value:', import.meta.env.VITE_FIREBASE_PROJECT_ID);
-console.log(
-  'Storage Bucket exists:',
-  !!import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-);
-console.log(
-  'Messaging Sender ID exists:',
-  !!import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-);
-console.log('App ID exists:', !!import.meta.env.VITE_FIREBASE_APP_ID);
+import logger from './logger';
+
+if (import.meta.env.DEV) {
+  logger.log('Firebase environment variables:', {
+    hasApiKey: !!import.meta.env.VITE_FIREBASE_API_KEY,
+    hasAuthDomain: !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    hasProjectId: !!import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    hasStorageBucket: !!import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    hasMessagingSenderId: !!import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    hasAppId: !!import.meta.env.VITE_FIREBASE_APP_ID,
+  });
+}
 
 // Helper function to strip quotes if they exist
 const stripQuotes = (str: string): string => {
@@ -41,50 +29,44 @@ const stripQuotes = (str: string): string => {
 };
 
 // Helper function to get environment variables with fallbacks
-const getEnvVar = (key: string, fallback: string): string => {
-  const envVar = import.meta.env[key];
+const isTestEnvironment =
+  typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+
+const getEnvVar = (key: string): string => {
+  const metaEnv = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
+  const envVar = (metaEnv && metaEnv[key]) ||
+    (typeof process !== 'undefined' ? process.env[key] : undefined);
+
   if (!envVar) {
-    console.warn(`Environment variable ${key} not found, using fallback`);
-    return fallback;
+    if (isTestEnvironment) {
+      logger.warn(`Using placeholder Firebase config for ${key} in test environment`);
+      return `test-${key.toLowerCase()}`;
+    }
+
+    logger.error(`Required environment variable ${key} is not defined`);
+    throw new Error(`Missing Firebase configuration value for ${key}`);
   }
-  return stripQuotes(envVar as string);
+
+  return stripQuotes(String(envVar));
 };
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: getEnvVar(
-    'VITE_FIREBASE_API_KEY',
-    'AIzaSyAYh45ZeAlQiryqEmwDAQgvcU3OoxO3EV8',
-  ),
-  authDomain: 'friday---ai-task-planner.firebaseapp.com',
-  projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', 'friday---ai-task-planner'),
-  storageBucket: getEnvVar(
-    'VITE_FIREBASE_STORAGE_BUCKET',
-    'friday---ai-task-planner.appspot.com',
-  ),
-  messagingSenderId: getEnvVar(
-    'VITE_FIREBASE_MESSAGING_SENDER_ID',
-    '702681640400',
-  ),
-  appId: getEnvVar(
-    'VITE_FIREBASE_APP_ID',
-    '1:702681640400:web:e887aa1c810d47e7f11dd5',
-  ),
+  apiKey: getEnvVar('VITE_FIREBASE_API_KEY'),
+  authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN'),
+  projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID'),
+  storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: getEnvVar('VITE_FIREBASE_APP_ID'),
 };
 
-// Log the actual configuration being used
-console.log('Firebase config being used:', {
-  apiKey: firebaseConfig.apiKey
-    ? 'First few chars: ' + firebaseConfig.apiKey.substring(0, 5) + '...'
-    : 'undefined',
-  authDomain: firebaseConfig.authDomain,
-  projectId: firebaseConfig.projectId,
-  storageBucket: firebaseConfig.storageBucket,
-  messagingSenderId: firebaseConfig.messagingSenderId,
-  appId: firebaseConfig.appId
-    ? 'First few chars: ' + firebaseConfig.appId.substring(0, 5) + '...'
-    : 'undefined',
-});
+if (import.meta.env.DEV) {
+  logger.log('Firebase config being used:', {
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId,
+    storageBucket: firebaseConfig.storageBucket,
+  });
+}
 
 // Initialize Firebase
 let app: FirebaseApp;
@@ -92,11 +74,11 @@ let auth: Auth;
 let googleProvider: GoogleAuthProvider;
 
 try {
-  console.log('[Firebase] Initializing Firebase app with config');
+  logger.log('[Firebase] Initializing Firebase app with config');
   app = initializeApp(firebaseConfig);
-  console.log('[Firebase] Firebase app initialized successfully');
+  logger.log('[Firebase] Firebase app initialized successfully');
   auth = getAuth(app);
-  console.log('[Firebase] Firebase auth initialized');
+  logger.log('[Firebase] Firebase auth initialized');
   googleProvider = new GoogleAuthProvider();
 
   // Configure Google provider for enhanced security
@@ -104,21 +86,21 @@ try {
     prompt: 'select_account',
   });
 
-  console.log('[Firebase] Firebase setup complete');
+  logger.log('[Firebase] Firebase setup complete');
 } catch (error) {
-  console.error('[Firebase] Error initializing Firebase:', error);
+  logger.error('[Firebase] Error initializing Firebase:', error);
   throw error;
 }
 
 // Sign in with Google popup
 export const signInWithGoogle = async () => {
   try {
-    console.log('Starting Google sign-in with popup...');
+    logger.log('Starting Google sign-in with popup...');
     const result = await signInWithPopup(auth, googleProvider);
-    console.log('Sign-in successful');
+    logger.log('Sign-in successful');
     return result.user;
   } catch (error) {
-    console.error('Error signing in with Google:', error);
+    logger.error('Error signing in with Google:', error);
     throw error;
   }
 };
@@ -128,7 +110,7 @@ export const logoutUser = async () => {
   try {
     await signOut(auth);
   } catch (error) {
-    console.error('Error signing out:', error);
+    logger.error('Error signing out:', error);
     throw error;
   }
 };
@@ -154,7 +136,7 @@ export const resetUserData = (userId: string): void => {
     }
   });
 
-  console.log(`Reset user data for user ID: ${userId}`);
+  logger.log(`Reset user data for user ID: ${userId}`);
 
   // Force reload to restart the app
   window.location.reload();

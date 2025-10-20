@@ -264,7 +264,7 @@ const initializeFirestoreWithAppropriateCache = async () => {
           '[Firestore] Offline persistence enabled via persistentLocalCache',
         );
       } catch (error) {
-        console.error('[Firestore] Error enabling persistence:', error);
+        logger.error('[Firestore] Error enabling persistence:', error);
       }
     }
 
@@ -338,51 +338,93 @@ export const COLLECTIONS = {
 };
 
 // Save tasks to Firestore
+type SaveTasksOptions = {
+  queued?: boolean;
+  changedTasks?: Task[];
+  deletedTaskIds?: string[];
+};
+
 export async function saveTasksToFirestore(
   userId: string,
   tasks: Task[],
   attempt = 1,
-  options: { queued?: boolean } = {},
+  options: SaveTasksOptions = {},
 ): Promise<void> {
-  const { queued = false } = options;
+  const { queued = false, changedTasks, deletedTaskIds = [] } = options;
   const description = `save tasks for user ${userId}`;
 
   try {
     await tryFirestoreOperation(description, async (database) => {
-      logger.log(
-        `[Firestore] Saving ${tasks.length} tasks for user: ${userId} (attempt ${attempt})`,
-      );
-      const batch = writeBatch(database);
+      const tasksById = new Map(tasks.map((task) => [task.id, task]));
+      const tasksToUpsert = new Map<string, Task>();
 
-      // Delete existing tasks first
+      if (changedTasks && changedTasks.length > 0) {
+        changedTasks.forEach((task) => {
+          tasksToUpsert.set(task.id, task);
+        });
+      } else {
+        tasks.forEach((task) => {
+          tasksToUpsert.set(task.id, task);
+        });
+      }
+
+      logger.log(
+        `[Firestore] Preparing to persist ${tasksToUpsert.size} updated tasks and ${deletedTaskIds.length} deletions for user: ${userId} (attempt ${attempt})`,
+      );
+
+      const batch = writeBatch(database);
+      let hasWrites = false;
+
       const tasksRef = collection(database, COLLECTIONS.TASKS);
       const q = query(tasksRef, where('userId', '==', userId));
       const querySnapshot = await getDocs(q);
 
+      const activeTaskIds = new Set(tasks.map((task) => task.id));
+      const docIdsToDelete = new Set<string>();
+
       querySnapshot.forEach((document) => {
-        batch.delete(document.ref);
+        const data = document.data();
+        const dataTaskId = typeof data.id === 'string' ? data.id : document.id;
+
+        if (!activeTaskIds.has(dataTaskId) || document.id !== dataTaskId) {
+          docIdsToDelete.add(document.id);
+          const taskForId = tasksById.get(dataTaskId);
+          if (taskForId) {
+            tasksToUpsert.set(dataTaskId, taskForId);
+          }
+        }
       });
 
-      // Add all tasks - make sure to include completed tasks
-      tasks.forEach((task) => {
-        const taskRef = doc(collection(database, COLLECTIONS.TASKS));
+      deletedTaskIds.forEach((taskId) => {
+        docIdsToDelete.add(taskId);
+      });
+
+      docIdsToDelete.forEach((docId) => {
+        const taskRef = doc(database, COLLECTIONS.TASKS, docId);
+        batch.delete(taskRef);
+        hasWrites = true;
+      });
+
+      tasksToUpsert.forEach((task) => {
+        const taskRef = doc(database, COLLECTIONS.TASKS, task.id);
         const taskWithUser = {
           ...prepareForFirestore(task),
           userId,
         };
 
-        // Debug log for completed tasks
-        if (task.completed) {
-          logger.log('[Firestore] Saving completed task:', task.name, task.id);
-        }
-
-        batch.set(taskRef, taskWithUser);
+        batch.set(taskRef, taskWithUser, { merge: true });
+        hasWrites = true;
       });
+
+      if (!hasWrites) {
+        logger.log('[Firestore] No task changes detected; skipping commit');
+        return;
+      }
 
       await batch.commit();
     });
 
-    logger.log(`[Firestore] Successfully saved ${tasks.length} tasks`);
+    logger.log('[Firestore] Task changes committed successfully');
 
     // Save a timestamp of last successful Firestore sync
     localStorage.setItem(
@@ -390,7 +432,7 @@ export async function saveTasksToFirestore(
       new Date().toISOString(),
     );
   } catch (error) {
-    console.error('Error saving tasks to Firestore:', error);
+    logger.error('Error saving tasks to Firestore:', error);
 
     if (!queued) {
       logger.log('[Firestore] Falling back to localStorage for saving tasks');
@@ -408,7 +450,10 @@ export async function saveTasksToFirestore(
     scheduleWriteRetry(
       description,
       (nextAttempt) =>
-        saveTasksToFirestore(userId, tasks, nextAttempt, { queued: true }),
+        saveTasksToFirestore(userId, tasks, nextAttempt, {
+          ...options,
+          queued: true,
+        }),
       attempt + 1,
     );
   }
@@ -504,7 +549,7 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
       return tasks;
     });
   } catch (error) {
-    console.error('Error loading tasks from Firestore:', error);
+    logger.error('Error loading tasks from Firestore:', error);
     const localTasks = loadTasks(userPrefix);
 
     if (localTasks.length > 0) {
@@ -566,7 +611,7 @@ export async function saveCategoriesToFirestore(
       new Date().toISOString(),
     );
   } catch (error) {
-    console.error('Error saving categories to Firestore:', error);
+    logger.error('Error saving categories to Firestore:', error);
 
     if (!queued) {
       logger.log(
@@ -658,7 +703,7 @@ export async function loadCategoriesFromFirestore(
       },
     );
   } catch (error) {
-    console.error('Error loading categories from Firestore:', error);
+    logger.error('Error loading categories from Firestore:', error);
     const localCategories = loadCategories(userPrefix);
 
     if (localCategories.length > 0) {
@@ -712,7 +757,7 @@ export async function savePreferencesToFirestore(
 
     savePreferences(preferences, `user_${userId}_`);
   } catch (error) {
-    console.error('Error saving preferences to Firestore:', error);
+    logger.error('Error saving preferences to Firestore:', error);
 
     if (!queued) {
       logger.log(
@@ -787,7 +832,7 @@ export async function loadPreferencesFromFirestore(
       },
     );
   } catch (error) {
-    console.error('Error loading preferences from Firestore:', error);
+    logger.error('Error loading preferences from Firestore:', error);
     return loadPreferences(userPrefix);
   }
 }
@@ -827,7 +872,7 @@ export async function saveOnboardingStatusToFirestore(
     );
     localStorage.setItem(`user_${userId}_onboarding_complete`, String(completed));
   } catch (error) {
-    console.error('Error saving onboarding status to Firestore:', error);
+    logger.error('Error saving onboarding status to Firestore:', error);
 
     if (!queued) {
       logger.log(
@@ -953,7 +998,7 @@ export async function loadOnboardingStatusFromFirestore(
       },
     );
   } catch (error) {
-    console.error('Error loading onboarding status from Firestore:', error);
+    logger.error('Error loading onboarding status from Firestore:', error);
     const localStatus =
       localStorage.getItem(`${userPrefix}onboarding_complete`) === 'true';
     logger.log(`[Firestore] Error fallback, using localStorage: ${localStatus}`);
@@ -996,7 +1041,7 @@ export async function saveStreakToFirestore(
 
     logger.log('[Firestore] Saved streak to Firestore');
   } catch (error) {
-    console.error('Error saving streak to Firestore:', error);
+    logger.error('Error saving streak to Firestore:', error);
 
     if (attempt >= MAX_WRITE_RETRY_ATTEMPTS) {
       logger.error(
@@ -1079,7 +1124,7 @@ export async function loadStreakFromFirestore(
       },
     );
   } catch (error) {
-    console.error('Error loading streak from Firestore:', error);
+    logger.error('Error loading streak from Firestore:', error);
     return null;
   }
 }
@@ -1191,7 +1236,7 @@ export async function migrateLocalStorageToFirestore(
 
     logger.log('[Firestore] Migration completed successfully');
   } catch (error) {
-    console.error('[Firestore] Error during migration:', error);
+    logger.error('[Firestore] Error during migration:', error);
     // No need to throw, we'll just keep using localStorage
   }
 }
@@ -1242,7 +1287,7 @@ export async function migrateTasksToFirestore(userId: string): Promise<void> {
       logger.log('[Firestore] No tasks to migrate');
     }
   } catch (error) {
-    console.error('[Firestore] Migration failed:', error);
+    logger.error('[Firestore] Migration failed:', error);
     throw error;
   }
 }
@@ -1272,7 +1317,7 @@ export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
     logger.log(`[Firestore] Fetched ${tasks.length} tasks`);
     return tasks;
   } catch (error) {
-    console.error('[Firestore] Error fetching tasks:', error);
+    logger.error('[Firestore] Error fetching tasks:', error);
 
     // If fetching fails, try to return local tasks as fallback
     const userPrefix = `user_${userId}_`;
@@ -1292,7 +1337,7 @@ export async function disableNetwork(): Promise<void> {
     await disableFirestoreNetwork(database);
     logger.log('[Firestore] Network disabled');
   } catch (error) {
-    console.error('[Firestore] Failed to disable network:', error);
+    logger.error('[Firestore] Failed to disable network:', error);
   }
 }
 
@@ -1306,7 +1351,7 @@ export async function enableNetwork(): Promise<void> {
     await enableFirestoreNetwork(database);
     logger.log('[Firestore] Network enabled');
   } catch (error) {
-    console.error('[Firestore] Failed to enable network:', error);
+    logger.error('[Firestore] Failed to enable network:', error);
   }
 }
 
@@ -1427,7 +1472,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
 
       return tasks;
     } catch (error) {
-      console.error('[Firestore] Force sync attempt failed:', error);
+      logger.error('[Firestore] Force sync attempt failed:', error);
 
       if (retryCount < MAX_RETRIES) {
         retryCount++;

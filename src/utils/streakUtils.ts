@@ -5,6 +5,7 @@ import {
   normalizeDate,
   parseLocalDateInput,
 } from './dateUtils';
+import logger from './logger';
 
 export const STREAK_STORAGE_KEY = 'friday_daily_streak_v1';
 export const STREAK_MILESTONES = [3, 7, 14, 21, 30, 60, 100];
@@ -40,7 +41,7 @@ export function loadStreakState(prefix: string = ''): StreakState {
           : null,
     };
   } catch (error) {
-    console.warn('[StreakUtils] Failed to parse streak state:', error);
+    logger.warn('[StreakUtils] Failed to parse streak state:', error);
     return { ...DEFAULT_STREAK_STATE };
   }
 }

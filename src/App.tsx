@@ -21,6 +21,7 @@ import { handleRecurringTaskCompletion } from './utils/recurringTaskService';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DevTools } from './components/DevTools';
 import { getTodayKey, getDateKey } from './utils/dateUtils';
+import logger from './utils/logger';
 
 // Helper to get a string key for today (YYYY-MM-DD) - DEPRECATED, use getTodayKey from dateUtils
 // function getTodayKey() {
@@ -129,16 +130,16 @@ function AppContent() {
   ];
 
   // Debug logging for progress circle
-  console.log("Today's Focus Tasks:", todayFocusTasks);
-  console.log(
+  logger.log("Today's Focus Tasks:", todayFocusTasks);
+  logger.log(
     "Today's Focus Completed:",
     todayFocusTasks.filter((t) => t.completed).length,
     'of',
     todayFocusTasks.length,
   );
-  console.log("Today's date string for comparison:", todayDateString);
-  console.log('Onboarding complete status:', onboarding_complete);
-  console.log(
+  logger.log("Today's date string for comparison:", todayDateString);
+  logger.log('Onboarding complete status:', onboarding_complete);
+  logger.log(
     'Task startDate strings:',
     assignedTasks.map((t) => ({
       name: t.name,
@@ -185,7 +186,7 @@ function AppContent() {
 
     // Set onboarding complete when first task is added
     if (!onboarding_complete) {
-      console.log('Setting onboarding complete after first task added');
+      logger.log('Setting onboarding complete after first task added');
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });
 
       // Also directly update localStorage
@@ -193,7 +194,7 @@ function AppContent() {
       if (user) {
         const userPrefix = `user_${user.uid}_`;
         localStorage.setItem(`${userPrefix}onboarding_complete`, 'true');
-        console.log('Directly updated localStorage onboarding status to true');
+        logger.log('Directly updated localStorage onboarding status to true');
       }
     }
 
@@ -297,12 +298,12 @@ function AppContent() {
   }, [isTaskInputExpanded, editingTask]);
 
   useEffect(() => {
-    console.log('isTaskInputExpanded:', isTaskInputExpanded);
+    logger.log('isTaskInputExpanded:', isTaskInputExpanded);
   }, [isTaskInputExpanded]);
 
   // Log onboarding status whenever it changes
   useEffect(() => {
-    console.log('Onboarding complete status changed:', onboarding_complete);
+    logger.log('Onboarding complete status changed:', onboarding_complete);
 
     // Check the localStorage directly
     const { user } = authState;
@@ -311,11 +312,11 @@ function AppContent() {
       const localStorageValue = localStorage.getItem(
         `${userPrefix}onboarding_complete`,
       );
-      console.log('LocalStorage onboarding status:', localStorageValue);
+      logger.log('LocalStorage onboarding status:', localStorageValue);
 
       // Force update localStorage if it doesn't match the current state
       if (onboarding_complete && localStorageValue !== 'true') {
-        console.log('Forcing localStorage update for onboarding status');
+        logger.log('Forcing localStorage update for onboarding status');
         localStorage.setItem(`${userPrefix}onboarding_complete`, 'true');
       }
     }
@@ -324,7 +325,7 @@ function AppContent() {
   // Check if there are tasks and force set onboarding status
   useEffect(() => {
     if (tasks.length > 0 && !onboarding_complete) {
-      console.log(
+      logger.log(
         'Tasks exist but onboarding not complete. Forcing onboarding complete.',
       );
       dispatch({ type: 'SET_ONBOARDING_COMPLETE', payload: true });

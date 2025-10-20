@@ -1,7 +1,14 @@
 // TaskCard.tsx
 // Renders a single task card with completion toggle, details, and priority info.
 
-import { Check, Clock, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
+import {
+  Check,
+  Clock,
+  Calendar,
+  AlertTriangle,
+  RefreshCw,
+} from 'lucide-react';
+import type { KeyboardEvent, MouseEvent } from 'react';
 import { Task } from '../types/task';
 import { formatTaskDate } from '../utils/dateUtils';
 import { isPast, isToday } from 'date-fns';
@@ -18,9 +25,20 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
   const isDueToday = isToday(task.dueDate);
 
   // Handle card click for editing
-  const handleCardClick = (e: React.MouseEvent) => {
+  const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {
     // Only trigger edit if not clicking on the completion toggle
     if (onEdit && !e.defaultPrevented) {
+      onEdit(task);
+    }
+  };
+
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!onEdit) {
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
       onEdit(task);
     }
   };
@@ -32,6 +50,12 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
         ${onEdit ? 'cursor-pointer hover:shadow-card-hover hover:scale-[1.01]' : ''}
       `}
       onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      role={onEdit ? 'button' : undefined}
+      tabIndex={onEdit ? 0 : undefined}
+      aria-label={
+        onEdit ? `View or edit task ${task.name}` : undefined
+      }
     >
       <div className="flex items-start gap-2 sm:gap-3">
         {/* Completion Toggle Button */}
@@ -41,11 +65,15 @@ export function TaskCard({ task, onToggleComplete, onEdit }: TaskCardProps) {
             e.stopPropagation(); // Stop event from bubbling up
             onToggleComplete(task.id);
           }}
+          type="button"
           className={`flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
             task.completed
               ? 'bg-success-500 border-success-500 text-white'
               : 'border-gray-300 hover:border-primary-400 hover:bg-primary-50'
           }`}
+          aria-label={
+            task.completed ? `Mark ${task.name} as incomplete` : `Mark ${task.name} as complete`
+          }
         >
           {task.completed && <Check className="w-3 h-3 sm:w-4 sm:h-4" />}
         </button>

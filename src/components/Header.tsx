@@ -2,11 +2,12 @@
 // App header: shows app name, date, progress circle for Today's Focus, and settings button.
 
 import { Flame, User } from 'lucide-react';
-import { ProgressCircle } from './ProgressCircle';
 import { useState, useEffect } from 'react';
+import { ProgressCircle } from './ProgressCircle';
 import { useAuth } from '../context/AuthContext';
 import { UserProfile } from './UserProfile';
 import { CategoryLimitMenu } from './CategoryLimitMenu';
+import logger from '../utils/logger';
 
 interface HeaderProps {
   todayTaskCount: number;
@@ -28,7 +29,7 @@ export function Header({
 
   useEffect(() => {
     if (user) {
-      console.log('User info in Header:', {
+      logger.log('User info in Header:', {
         displayName: user.displayName,
         photoURL: user.photoURL,
         email: user.email?.substring(0, 5) + '...', // Only log part of the email for privacy
@@ -135,7 +136,7 @@ export function Header({
                     className="object-cover"
                     style={{ width: '100%', height: '100%' }}
                     onError={() => {
-                      console.error(
+                      logger.error(
                         'Failed to load user profile image:',
                         user.photoURL,
                       );

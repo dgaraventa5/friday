@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { forceSyncFromFirestore } from '../utils/firestoreService';
 import { Task } from '../types/task';
+import logger from '../utils/logger';
 
 interface UserProfileProps {
   onOpenSettings?: () => void;
@@ -36,7 +37,7 @@ export function UserProfile({ onOpenSettings }: UserProfileProps) {
       // Update state with server data
       dispatch({ type: 'SET_TASKS', payload: tasks });
 
-      console.log(`[Force Sync] Synced ${tasks.length} tasks from server`);
+      logger.log(`[Force Sync] Synced ${tasks.length} tasks from server`);
       setSyncStatus({
         message: `Successfully synced ${tasks.length} tasks from server`,
         type: 'success',
@@ -49,7 +50,7 @@ export function UserProfile({ onOpenSettings }: UserProfileProps) {
         );
       }, 5000);
     } catch (error) {
-      console.error('Error during force sync:', error);
+      logger.error('Error during force sync:', error);
       setSyncStatus({
         message: 'Error syncing tasks. Please try again later.',
         type: 'error',

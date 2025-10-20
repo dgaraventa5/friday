@@ -1,6 +1,8 @@
+import { useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { format, isBefore } from 'date-fns';
 import { Task } from '../types/task';
 import { TaskCard } from './TaskCard';
-import { format, isBefore } from 'date-fns';
 import { getDateKey, normalizeDate, getTodayKey } from '../utils/dateUtils';
 import { PageLayout } from './PageLayout';
 
@@ -25,32 +27,45 @@ function groupTasksByStartDate(tasks: Task[]): Record<string, Task[]> {
   );
 }
 
-export function SchedulePage({
-  tasks,
-  onToggleComplete,
-  onEdit,
-}: SchedulePageProps) {
-  // Group and sort dates
-  const grouped = groupTasksByStartDate(tasks);
+export function SchedulePage({ tasks, onToggleComplete, onEdit }: SchedulePageProps) {
+  const grouped = useMemo(() => groupTasksByStartDate(tasks), [tasks]);
   const today = normalizeDate(new Date());
   // Use local date string for today's key to avoid timezone issues
   const todayKey = getTodayKey();
 
-  // Debug logging to help diagnose issues
-  console.log('SchedulePage - Today key:', todayKey);
-  console.log('SchedulePage - Available date keys:', Object.keys(grouped));
-  console.log('SchedulePage - Tasks for today:', grouped[todayKey] || []);
+  const sortedDates = useMemo(
+    () =>
+      Object.keys(grouped)
+        .filter((dateKey) => {
+          const dateObj = new Date(dateKey + 'T00:00:00');
+          return !isBefore(dateObj, today) || dateKey === todayKey;
+        })
+        .sort(),
+    [grouped, today, todayKey],
+  );
 
-  const sortedDates = Object.keys(grouped)
-    .filter((dateKey) => {
-      // Parse the date in local time to avoid timezone issues
-      const dateObj = new Date(dateKey + 'T00:00:00');
-      return !isBefore(dateObj, today) || dateKey === todayKey;
-    })
-    .sort();
+  const scheduleSections = useMemo(
+    () =>
+      sortedDates.map((dateKey) => ({
+        dateKey,
+        tasks: grouped[dateKey] ?? [],
+      })),
+    [grouped, sortedDates],
+  );
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: scheduleSections.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: (index) => {
+      const taskCount = scheduleSections[index]?.tasks.length ?? 0;
+      return 96 + Math.max(taskCount, 1) * 128;
+    },
+    overscan: 4,
+  });
 
   return (
-    <PageLayout allowScroll={true}>
+    <PageLayout>
       <div className="flex items-center gap-2 mb-3 sm:mb-4">
         <span role="img" aria-label="calendar" className="text-xl sm:text-2xl">
           🗓️
@@ -66,43 +81,62 @@ export function SchedulePage({
         </div>
       )}
 
-      {sortedDates.map((dateKey) => {
-        // Create a date object directly from the local date string
-        // Add T00:00:00 to ensure it's parsed as local time
-        const dateObj = new Date(dateKey + 'T00:00:00');
-
-        // Debug log to see what date we're working with
-        console.log(
-          'Rendering date:',
-          dateKey,
-          'as Date object:',
-          dateObj,
-          'formatted:',
-          format(dateObj, 'EEE MMM d yyyy'),
-        );
-
-        return (
+      {scheduleSections.length > 0 && (
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto pb-6 pr-1"
+        >
           <div
-            key={dateKey}
-            className="bg-white rounded-xl sm:rounded-2xl shadow-card p-3 sm:p-4 md:p-6 mb-3 sm:mb-4"
+            style={{
+              height: virtualizer.getTotalSize(),
+              width: '100%',
+              position: 'relative',
+            }}
           >
-            <h2 className="text-base sm:text-lg font-bold text-neutral-800 mb-2">
-              {format(dateObj, 'EEE, MMM d')}
-            </h2>
-            <div className="space-y-2">
-              {grouped[dateKey].map((task) => (
-                <div key={task.id}>
-                  <TaskCard
-                    task={task}
-                    onToggleComplete={onToggleComplete}
-                    onEdit={onEdit}
-                  />
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const section = scheduleSections[virtualRow.index];
+
+              if (!section) {
+                return null;
+              }
+
+              const dateObj = new Date(section.dateKey + 'T00:00:00');
+
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  className="pb-3 sm:pb-4"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <div className="bg-white rounded-xl sm:rounded-2xl shadow-card p-3 sm:p-4 md:p-6">
+                    <h2 className="text-base sm:text-lg font-bold text-neutral-800 mb-2">
+                      {format(dateObj, 'EEE, MMM d')}
+                    </h2>
+                    <div className="space-y-2">
+                      {section.tasks.map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onToggleComplete={onToggleComplete}
+                          onEdit={onEdit}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      )}
     </PageLayout>
   );
 }

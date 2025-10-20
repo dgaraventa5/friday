@@ -11,6 +11,7 @@ import {
   useState,
   useCallback,
   memo,
+  useRef,
 } from 'react';
 import { Task, Category } from '../types/task';
 import { UserPreferences } from '../types/user';
@@ -180,6 +181,7 @@ function syncRecurringSeries(
       : null;
 
   const today = normalizeDate(new Date());
+  const seriesUpdatedAt = normalizedUpdatedTask.updatedAt ?? new Date();
 
   return normalizedTasks.reduce<Task[]>((acc, task) => {
     const matchesSeries = belongsToRecurringSeries(task, seriesId);
@@ -226,6 +228,7 @@ function syncRecurringSeries(
           recurringEndCount: undefined,
           recurringCurrentCount: undefined,
           recurringSeriesId: undefined,
+          updatedAt: seriesUpdatedAt,
         });
       }
       return acc;
@@ -253,6 +256,7 @@ function syncRecurringSeries(
       recurringDays: normalizedUpdatedTask.recurringDays,
       recurringEndType: normalizedUpdatedTask.recurringEndType,
       recurringEndCount: normalizedUpdatedTask.recurringEndCount,
+      updatedAt: seriesUpdatedAt,
     });
 
     return acc;
@@ -306,6 +310,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
               startDate: !task.completed
                 ? normalizeDate(new Date())
                 : task.startDate,
+              updatedAt: new Date(),
             }
           : task,
       );
@@ -462,7 +467,13 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   }, [toggleTestMode]);
 
   // Load data from Firestore on mount, with localStorage fallback
+  const lastSyncedTasksRef = useRef<Map<string, string>>(new Map());
+  const hasInitializedTaskSyncRef = useRef(false);
+
   useEffect(() => {
+    lastSyncedTasksRef.current = new Map();
+    hasInitializedTaskSyncRef.current = false;
+
     if (userId) {
       logger.log('[AppContext] Loading data for user:', userId);
       dispatch({ type: 'SET_LOADING', payload: true });
@@ -472,7 +483,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
 
       // Helper function to handle errors
       const handleError = (error: unknown) => {
-        console.error('[AppContext] Error loading data:', error);
+        logger.error('[AppContext] Error loading data:', error);
         dispatch({ type: 'SET_ERROR', payload: 'Failed to load your data' });
         dispatch({ type: 'SET_LOADING', payload: false });
       };
@@ -547,7 +558,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
             // Save default categories to Firestore
             saveCategoriesToFirestore(userId, defaultCategories).catch(
               (error) => {
-                console.error(
+                logger.error(
                   '[AppContext] Error saving default categories:',
                   error,
                 );
@@ -626,7 +637,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
               await pendingMigration;
               logger.log('[AppContext] Migration complete');
             } catch (error) {
-              console.error('[AppContext] Migration failed:', error);
+              logger.error('[AppContext] Migration failed:', error);
             }
           }
 
@@ -634,7 +645,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
           dispatch({ type: 'SET_LOADING', payload: false });
         })
         .catch((error) => {
-          console.error(
+          logger.error(
             '[AppContext] Firestore load failed, using localStorage:',
             error,
           );
@@ -705,15 +716,72 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
 
   // Save tasks to Firestore when they change
   useEffect(() => {
-    if (state.tasks.length > 0 && userId && isDataLoaded) {
-      logger.log(`[AppContext] Saving ${state.tasks.length} tasks`);
-
-      // Save to Firestore with localStorage fallback
-      saveTasksToFirestore(userId, state.tasks).catch((error) => {
-        console.error('[AppContext] Error saving tasks to Firestore:', error);
-        // Fallback to localStorage already handled in the service
-      });
+    if (!userId || !isDataLoaded) {
+      return;
     }
+
+    logger.log(
+      `[AppContext] Evaluating task changes for ${state.tasks.length} tasks`,
+    );
+
+    // Save to Firestore with localStorage fallback
+    const previousSnapshot = lastSyncedTasksRef.current;
+
+    const nextSnapshot = new Map(
+      state.tasks.map((task) => [
+        task.id,
+        task.updatedAt ? task.updatedAt.toISOString() : '',
+      ]),
+    );
+
+    if (!hasInitializedTaskSyncRef.current) {
+      lastSyncedTasksRef.current = nextSnapshot;
+      hasInitializedTaskSyncRef.current = true;
+      return;
+    }
+
+    const changedTasks = state.tasks.filter((task) => {
+      const previousUpdatedAt = previousSnapshot.get(task.id);
+      const currentUpdatedAt = task.updatedAt
+        ? task.updatedAt.toISOString()
+        : '';
+      return previousUpdatedAt !== currentUpdatedAt;
+    });
+
+    const currentIds = new Set(state.tasks.map((task) => task.id));
+    const deletedTaskIds = Array.from(previousSnapshot.keys()).filter(
+      (taskId) => !currentIds.has(taskId),
+    );
+
+    if (changedTasks.length === 0 && deletedTaskIds.length === 0) {
+      return;
+    }
+
+    logger.log(
+      `[AppContext] Syncing ${changedTasks.length} updated tasks and ${deletedTaskIds.length} deletions`,
+    );
+
+    saveTasksToFirestore(userId, state.tasks, 1, {
+      changedTasks,
+      deletedTaskIds,
+    })
+      .then(() => {
+        const updatedSnapshot = new Map(previousSnapshot);
+        changedTasks.forEach((task) => {
+          updatedSnapshot.set(
+            task.id,
+            task.updatedAt ? task.updatedAt.toISOString() : '',
+          );
+        });
+        deletedTaskIds.forEach((taskId) => {
+          updatedSnapshot.delete(taskId);
+        });
+
+        lastSyncedTasksRef.current = updatedSnapshot;
+      })
+      .catch((error) => {
+        logger.error('[AppContext] Error saving tasks to Firestore:', error);
+      });
   }, [state.tasks, userId, isDataLoaded]);
 
   // Save categories to Firestore when they change
@@ -723,10 +791,10 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
 
       // Save to Firestore with localStorage fallback
       saveCategoriesToFirestore(userId, state.categories).catch((error) => {
-        console.error(
-          '[AppContext] Error saving categories to Firestore:',
-          error,
-        );
+                logger.error(
+                  '[AppContext] Error saving categories to Firestore:',
+                  error,
+                );
         // Fallback to localStorage already handled in the service
       });
     }
@@ -739,7 +807,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
 
       // Save to Firestore with localStorage fallback
       savePreferencesToFirestore(userId, state.preferences).catch((error) => {
-        console.error(
+        logger.error(
           '[AppContext] Error saving preferences to Firestore:',
           error,
         );
@@ -758,7 +826,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
       // Save to Firestore with localStorage fallback
       saveOnboardingStatusToFirestore(userId, state.onboarding_complete).catch(
         (error) => {
-          console.error(
+          logger.error(
             '[AppContext] Error saving onboarding status to Firestore:',
             error,
           );
@@ -778,7 +846,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
       const userPrefix = `user_${userId}_`;
       saveStreakState(state.streak, userPrefix);
       saveStreakToFirestore(userId, state.streak).catch((error) => {
-        console.error('[AppContext] Error saving streak to Firestore:', error);
+        logger.error('[AppContext] Error saving streak to Firestore:', error);
       });
     }
   }, [state.streak, userId, isDataLoaded]);

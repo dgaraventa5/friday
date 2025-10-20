@@ -12,6 +12,7 @@ import {
   parseLocalDateInput,
   normalizeRecurringDays,
 } from '../utils/dateUtils';
+import logger from '../utils/logger';
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -110,10 +111,10 @@ export function TaskInput({
 
     try {
       const result = await Promise.resolve(onAddTask(newTask));
-      if (!result.success) {
-        setSubmitError(result.message || 'Unable to add task');
-        return;
-      }
+    if (!result.success) {
+      setSubmitError(result.message || 'Unable to add task');
+      return;
+    }
 
       // Reset form state
       setTask({
@@ -133,7 +134,7 @@ export function TaskInput({
       setSubmitError(null);
       setShowRecurrence(false);
     } catch (error) {
-      console.error('Failed to add task', error);
+      logger.error('Failed to add task', error);
       setSubmitError('Unable to add task');
     } finally {
       setIsSubmitting(false);
