@@ -454,17 +454,60 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   const [taskSyncStatus, setTaskSyncStatus] = useState<TaskSyncStatus>({
     status: 'idle',
   });
-  const taskSyncWaitersRef = useRef<((status: TaskSyncStatus) => void)[]>([]);
+  const taskSyncSequenceRef = useRef(0);
+  const lastCompletedTaskSyncRef = useRef(0);
+  const taskSyncWaitersRef = useRef<
+    { resolve: (status: TaskSyncStatus) => void; sequence: number }[]
+  >([]);
+  const completedTaskSyncsRef = useRef<Map<number, TaskSyncStatus>>(new Map());
 
-  const resolveTaskSyncWaiters = useCallback((status: TaskSyncStatus) => {
-    if (taskSyncWaitersRef.current.length === 0) {
-      return;
-    }
+  const resolveTaskSyncWaiters = useCallback(
+    (sequence: number, status: TaskSyncStatus) => {
+      completedTaskSyncsRef.current.set(sequence, status);
 
-    const resolvers = [...taskSyncWaitersRef.current];
-    taskSyncWaitersRef.current = [];
-    resolvers.forEach((resolve) => resolve(status));
-  }, []);
+      let nextSequence = lastCompletedTaskSyncRef.current + 1;
+      while (completedTaskSyncsRef.current.has(nextSequence)) {
+        lastCompletedTaskSyncRef.current = nextSequence;
+        nextSequence += 1;
+      }
+
+      if (taskSyncWaitersRef.current.length === 0) {
+        // Clean up any completed sequences we can no longer observe
+        Array.from(completedTaskSyncsRef.current.keys()).forEach(
+          (completedSequence) => {
+            if (completedSequence <= lastCompletedTaskSyncRef.current) {
+              completedTaskSyncsRef.current.delete(completedSequence);
+            }
+          },
+        );
+        return;
+      }
+
+      const remainingWaiters: typeof taskSyncWaitersRef.current = [];
+
+      taskSyncWaitersRef.current.forEach(({ resolve, sequence: waiterSequence }) => {
+        const completedStatus = completedTaskSyncsRef.current.get(waiterSequence);
+        if (completedStatus) {
+          resolve(completedStatus);
+          if (waiterSequence <= lastCompletedTaskSyncRef.current) {
+            completedTaskSyncsRef.current.delete(waiterSequence);
+          }
+        } else {
+          remainingWaiters.push({ resolve, sequence: waiterSequence });
+        }
+      });
+
+      taskSyncWaitersRef.current = remainingWaiters;
+
+      // Remove any completed sequences that are now confirmed delivered
+      Array.from(completedTaskSyncsRef.current.keys()).forEach((completedSequence) => {
+        if (completedSequence <= lastCompletedTaskSyncRef.current) {
+          completedTaskSyncsRef.current.delete(completedSequence);
+        }
+      });
+    },
+    [],
+  );
 
   const waitForNextTaskSync = useCallback(() => {
     if (!userId || !isDataLoaded) {
@@ -472,7 +515,11 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
     }
 
     return new Promise<TaskSyncStatus>((resolve) => {
-      taskSyncWaitersRef.current.push(resolve);
+      const nextSequence = Math.max(
+        taskSyncSequenceRef.current + 1,
+        lastCompletedTaskSyncRef.current + 1,
+      );
+      taskSyncWaitersRef.current.push({ resolve, sequence: nextSequence });
     });
   }, [userId, isDataLoaded]);
 
@@ -795,6 +842,9 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
       `[AppContext] Syncing ${changedTasks.length} updated tasks and ${deletedTaskIds.length} deletions`,
     );
 
+    taskSyncSequenceRef.current += 1;
+    const currentSequence = taskSyncSequenceRef.current;
+
     setTaskSyncStatus({ status: 'pending' });
 
     saveTasksToFirestore(userId, state.tasks, 1, {
@@ -817,7 +867,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
 
         const successStatus: TaskSyncStatus = { status: 'success' };
         setTaskSyncStatus(successStatus);
-        resolveTaskSyncWaiters(successStatus);
+        resolveTaskSyncWaiters(currentSequence, successStatus);
       })
       .catch((error) => {
         logger.error('[AppContext] Error saving tasks to Firestore:', error);
@@ -828,7 +878,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
             message: error.message,
           };
           setTaskSyncStatus(queuedStatus);
-          resolveTaskSyncWaiters(queuedStatus);
+          resolveTaskSyncWaiters(currentSequence, queuedStatus);
           return;
         }
 
@@ -841,7 +891,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
           message,
         };
         setTaskSyncStatus(errorStatus);
-        resolveTaskSyncWaiters(errorStatus);
+        resolveTaskSyncWaiters(currentSequence, errorStatus);
       });
   }, [state.tasks, userId, isDataLoaded]);
 
