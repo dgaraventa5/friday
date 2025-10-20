@@ -586,6 +586,7 @@ export function assignStartDates(
         const used = categoryHours[cat] || 0;
         const estimatedHours = task.estimatedHours || 1;
         const isDueNow = task.dueDate.getTime() <= normalizedCurrentTime;
+        const canBypassLimits = isDueNow && !isWknd;
 
         // Skip Work tasks on weekends only if they aren't due now
         if (isWknd && cat === 'Work' && !isDueNow) {
@@ -593,13 +594,13 @@ export function assignStartDates(
         }
 
         const withinCategoryLimit = used + estimatedHours <= applicableCap;
-        if (!withinCategoryLimit && !isDueNow) {
+        if (!withinCategoryLimit && !canBypassLimits) {
           continue;
         }
 
         const withinDailyLimit =
           totalHoursForDay + estimatedHours <= applicableDailyCap;
-        if (!withinDailyLimit && !isDueNow) {
+        if (!withinDailyLimit && !canBypassLimits) {
           continue;
         }
 

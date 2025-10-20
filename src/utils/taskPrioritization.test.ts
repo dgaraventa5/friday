@@ -201,6 +201,80 @@ describe('assignStartDates category limits', () => {
   });
 });
 
+describe('assignStartDates weekend handling for overdue work tasks', () => {
+  it('does not exceed weekend caps for overdue work and rolls remaining hours forward', () => {
+    const baseDate = normalizeDate(new Date('2025-09-06')); // Saturday
+    const sundayDate = normalizeDate(addDays(baseDate, 1));
+    const mondayDate = normalizeDate(addDays(baseDate, 2));
+
+    const workCategory: Category = {
+      id: 'work',
+      name: 'Work',
+      color: 'blue',
+      dailyLimit: 4,
+      icon: '💼',
+    };
+
+    const completedSundayWork: Task = {
+      id: 'completed-sunday',
+      name: 'Completed Sunday work',
+      category: workCategory,
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: sundayDate,
+      startDate: sundayDate,
+      createdAt: sundayDate,
+      updatedAt: sundayDate,
+      completed: true,
+      estimatedHours: 2,
+    };
+
+    const overdueTasks: Task[] = Array.from({ length: 3 }).map((_, index) => ({
+      id: `overdue-${index + 1}`,
+      name: `Overdue Work ${index + 1}`,
+      category: workCategory,
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: normalizeDate(new Date('2025-09-04')), // Thursday, overdue
+      startDate: normalizeDate(new Date('2025-09-04')),
+      createdAt: normalizeDate(new Date('2025-09-01')),
+      updatedAt: normalizeDate(new Date('2025-09-01')),
+      completed: false,
+      estimatedHours: 1,
+    }));
+
+    const result = assignStartDates(
+      [...overdueTasks, completedSundayWork],
+      4,
+      DEFAULT_CATEGORY_LIMITS,
+      { weekday: DEFAULT_DAILY_MAX_HOURS.weekday, weekend: 2 },
+      baseDate,
+    );
+
+    const scheduledWorkTasks = result.filter(
+      (task) => !task.completed && task.category?.name === 'Work',
+    );
+
+    const saturdayKey = getDateKey(baseDate);
+    const sundayKey = getDateKey(sundayDate);
+    const mondayKey = getDateKey(mondayDate);
+
+    const saturdayAssignments = scheduledWorkTasks.filter(
+      (task) => getDateKey(task.startDate) === saturdayKey,
+    );
+    const sundayAssignments = scheduledWorkTasks.filter(
+      (task) => getDateKey(task.startDate) === sundayKey,
+    );
+    const mondayAssignments = scheduledWorkTasks.filter(
+      (task) => getDateKey(task.startDate) === mondayKey,
+    );
+
+    expect(saturdayAssignments).toHaveLength(2);
+    expect(sundayAssignments).toHaveLength(0);
+    expect(mondayAssignments).toHaveLength(1);
+  });
+});
+
 describe('assignStartDates due tasks vs future high priority tasks', () => {
   it('prioritizes tasks due on the current day before higher-scoring future tasks', () => {
     const baseDate = normalizeDate(new Date('2025-09-01')); // Monday
