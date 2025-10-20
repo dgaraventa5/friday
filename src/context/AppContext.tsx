@@ -33,6 +33,7 @@ import {
   migrateLocalStorageToFirestore,
   loadStreakFromFirestore,
   saveStreakToFirestore,
+  FirestoreSyncError,
 } from '../utils/firestoreService';
 import {
   ensureStableRecurringSeriesIds,
@@ -68,6 +69,13 @@ interface AppState {
   onboarding_complete: boolean;
   streak: StreakState;
 }
+
+type TaskSyncStatus =
+  | { status: 'idle' }
+  | { status: 'pending' }
+  | { status: 'success' }
+  | { status: 'queued'; message: string }
+  | { status: 'error'; message: string };
 
 // Define the actions that can modify our state
 // Each action type describes a possible state change
@@ -124,6 +132,8 @@ const AppContext = createContext<{
   dispatch: React.Dispatch<AppAction>;
   testMode: boolean;
   toggleTestMode: () => void;
+  taskSyncStatus: TaskSyncStatus;
+  waitForNextTaskSync: () => Promise<TaskSyncStatus>;
 } | null>(null);
 
 function resolveRecurringSeriesId(
@@ -441,6 +451,54 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   const userId = user?.uid; // Create stable reference to user ID
   const [testMode, setTestMode] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [taskSyncStatus, setTaskSyncStatus] = useState<TaskSyncStatus>({
+    status: 'idle',
+  });
+  const taskSyncSequenceRef = useRef(0);
+  const lastCompletedTaskSyncRef = useRef(0);
+  const taskSyncWaitersRef = useRef<
+    { resolve: (status: TaskSyncStatus) => void; sequence: number }[]
+  >([]);
+
+  const resolveTaskSyncWaiters = useCallback(
+    (sequence: number, status: TaskSyncStatus) => {
+      lastCompletedTaskSyncRef.current = Math.max(
+        lastCompletedTaskSyncRef.current,
+        sequence,
+      );
+
+      if (taskSyncWaitersRef.current.length === 0) {
+        return;
+      }
+
+      const remainingWaiters: typeof taskSyncWaitersRef.current = [];
+
+      taskSyncWaitersRef.current.forEach(({ resolve, sequence: waiterSequence }) => {
+        if (waiterSequence <= sequence) {
+          resolve(status);
+        } else {
+          remainingWaiters.push({ resolve, sequence: waiterSequence });
+        }
+      });
+
+      taskSyncWaitersRef.current = remainingWaiters;
+    },
+    [],
+  );
+
+  const waitForNextTaskSync = useCallback(() => {
+    if (!userId || !isDataLoaded) {
+      return Promise.resolve<TaskSyncStatus>({ status: 'success' });
+    }
+
+    return new Promise<TaskSyncStatus>((resolve) => {
+      const nextSequence = Math.max(
+        taskSyncSequenceRef.current + 1,
+        lastCompletedTaskSyncRef.current + 1,
+      );
+      taskSyncWaitersRef.current.push({ resolve, sequence: nextSequence });
+    });
+  }, [userId, isDataLoaded]);
 
   // Function to toggle test mode for onboarding testing
   const toggleTestMode = useCallback(() => {
@@ -761,6 +819,11 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
       `[AppContext] Syncing ${changedTasks.length} updated tasks and ${deletedTaskIds.length} deletions`,
     );
 
+    taskSyncSequenceRef.current += 1;
+    const currentSequence = taskSyncSequenceRef.current;
+
+    setTaskSyncStatus({ status: 'pending' });
+
     saveTasksToFirestore(userId, state.tasks, 1, {
       changedTasks,
       deletedTaskIds,
@@ -778,9 +841,34 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
         });
 
         lastSyncedTasksRef.current = updatedSnapshot;
+
+        const successStatus: TaskSyncStatus = { status: 'success' };
+        setTaskSyncStatus(successStatus);
+        resolveTaskSyncWaiters(currentSequence, successStatus);
       })
       .catch((error) => {
         logger.error('[AppContext] Error saving tasks to Firestore:', error);
+
+        if (error instanceof FirestoreSyncError && error.queued) {
+          const queuedStatus: TaskSyncStatus = {
+            status: 'queued',
+            message: error.message,
+          };
+          setTaskSyncStatus(queuedStatus);
+          resolveTaskSyncWaiters(currentSequence, queuedStatus);
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Failed to sync tasks to the cloud.';
+        const errorStatus: TaskSyncStatus = {
+          status: 'error',
+          message,
+        };
+        setTaskSyncStatus(errorStatus);
+        resolveTaskSyncWaiters(currentSequence, errorStatus);
       });
   }, [state.tasks, userId, isDataLoaded]);
 
@@ -852,7 +940,16 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   }, [state.streak, userId, isDataLoaded]);
 
   return (
-    <AppContext.Provider value={{ state, dispatch, testMode, toggleTestMode }}>
+    <AppContext.Provider
+      value={{
+        state,
+        dispatch,
+        testMode,
+        toggleTestMode,
+        taskSyncStatus,
+        waitForNextTaskSync,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

@@ -53,6 +53,8 @@ describe('CategoryLimitMenu', () => {
       dispatch: dispatchMock,
       testMode: false,
       toggleTestMode: jest.fn(),
+      taskSyncStatus: { status: 'idle' },
+      waitForNextTaskSync: jest.fn().mockResolvedValue({ status: 'success' }),
     });
 
     render(<CategoryLimitMenu onClose={onClose} />);

@@ -32,7 +32,7 @@ import logger from './utils/logger';
 
 function AppContent() {
   // Get global state and dispatch from context
-  const { state, dispatch } = useApp();
+  const { state, dispatch, waitForNextTaskSync } = useApp();
   const { tasks, categories, ui, onboarding_complete, streak } = state;
   const [isTaskInputExpanded, setIsTaskInputExpanded] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -181,8 +181,9 @@ function AppContent() {
       return { success: false, message: limitCheck.message };
     }
 
+    const syncPromise = waitForNextTaskSync();
+
     dispatch({ type: 'ADD_TASK', payload: task });
-    setIsTaskInputExpanded(false);
 
     // Set onboarding complete when first task is added
     if (!onboarding_complete) {
@@ -198,7 +199,37 @@ function AppContent() {
       }
     }
 
-    return { success: true };
+    try {
+      const syncResult = await syncPromise;
+
+      if (syncResult.status === 'success') {
+        setIsTaskInputExpanded(false);
+        return { success: true };
+      }
+
+      if (syncResult.status === 'queued') {
+        return {
+          success: true,
+          queued: true,
+          message:
+            syncResult.message ||
+            'Task saved locally. We will sync it when your connection improves.',
+        };
+      }
+
+      return {
+        success: false,
+        message:
+          syncResult.message ||
+          'We could not save your task to the cloud. Please try again.',
+      };
+    } catch (error) {
+      logger.error('Failed to await task sync status', error);
+      return {
+        success: false,
+        message: 'We could not confirm that your task was saved.',
+      };
+    }
   };
 
   // Handle task editing

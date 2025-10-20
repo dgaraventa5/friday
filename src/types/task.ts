@@ -46,4 +46,5 @@ export interface TaskScore {
 export interface AddTaskResult {
   success: boolean;
   message?: string;
+  queued?: boolean;
 }

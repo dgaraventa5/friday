@@ -50,8 +50,10 @@ export function TaskInput({
   const [errors, setErrors] = useState<ValidationError[]>([]);
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Error from submitting
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  // Feedback from submitting (errors or queued sync info)
+  const [submitMessage, setSubmitMessage] = useState<
+    { type: 'error' | 'info'; text: string }
+  | null>(null);
   // Toggle for additional options section
   const [showRecurrence, setShowRecurrence] = useState(false);
 
@@ -59,14 +61,14 @@ export function TaskInput({
   const handleChange = (field: keyof Task, value: Task[keyof Task]) => {
     setTask((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => prev.filter((error) => error.field !== field));
-    setSubmitError(null);
+    setSubmitMessage(null);
   };
 
   // Handle form submit: validate, create new Task, call onAddTask
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setSubmitError(null);
+    setSubmitMessage(null);
 
     const validation = validateTask(task);
     if (!validation.isValid) {
@@ -111,10 +113,23 @@ export function TaskInput({
 
     try {
       const result = await Promise.resolve(onAddTask(newTask));
-    if (!result.success) {
-      setSubmitError(result.message || 'Unable to add task');
-      return;
-    }
+      if (!result.success) {
+        setSubmitMessage({
+          type: 'error',
+          text: result.message || 'Unable to add task',
+        });
+        return;
+      }
+
+      if (result.queued) {
+        setSubmitMessage({
+          type: 'info',
+          text:
+            result.message ||
+            'Task saved locally. We will sync it when your connection improves.',
+        });
+        return;
+      }
 
       // Reset form state
       setTask({
@@ -131,11 +146,11 @@ export function TaskInput({
         recurringDays: [],
       });
       setErrors([]);
-      setSubmitError(null);
+      setSubmitMessage(null);
       setShowRecurrence(false);
     } catch (error) {
       logger.error('Failed to add task', error);
-      setSubmitError('Unable to add task');
+      setSubmitMessage({ type: 'error', text: 'Unable to add task' });
     } finally {
       setIsSubmitting(false);
     }
@@ -156,7 +171,7 @@ export function TaskInput({
       recurringCurrentCount: 0,
       recurringDays: [],
     });
-    setSubmitError(null);
+    setSubmitMessage(null);
     setShowRecurrence(false);
     onCancel?.();
   };
@@ -198,12 +213,16 @@ export function TaskInput({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-4 sm:space-y-6">
-          {submitError && (
+          {submitMessage && (
             <div
               role="alert"
-              className="p-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded"
+              className={`p-2 text-sm border rounded ${
+                submitMessage.type === 'error'
+                  ? 'text-red-600 bg-red-50 border-red-100'
+                  : 'text-blue-700 bg-blue-50 border-blue-200'
+              }`}
             >
-              {submitError}
+              {submitMessage.text}
             </div>
           )}
           {/* Basics */}
