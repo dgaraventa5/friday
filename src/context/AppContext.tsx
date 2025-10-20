@@ -454,17 +454,37 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   const [taskSyncStatus, setTaskSyncStatus] = useState<TaskSyncStatus>({
     status: 'idle',
   });
-  const taskSyncWaitersRef = useRef<((status: TaskSyncStatus) => void)[]>([]);
+  const taskSyncSequenceRef = useRef(0);
+  const lastCompletedTaskSyncRef = useRef(0);
+  const taskSyncWaitersRef = useRef<
+    { resolve: (status: TaskSyncStatus) => void; sequence: number }[]
+  >([]);
 
-  const resolveTaskSyncWaiters = useCallback((status: TaskSyncStatus) => {
-    if (taskSyncWaitersRef.current.length === 0) {
-      return;
-    }
+  const resolveTaskSyncWaiters = useCallback(
+    (sequence: number, status: TaskSyncStatus) => {
+      lastCompletedTaskSyncRef.current = Math.max(
+        lastCompletedTaskSyncRef.current,
+        sequence,
+      );
 
-    const resolvers = [...taskSyncWaitersRef.current];
-    taskSyncWaitersRef.current = [];
-    resolvers.forEach((resolve) => resolve(status));
-  }, []);
+      if (taskSyncWaitersRef.current.length === 0) {
+        return;
+      }
+
+      const remainingWaiters: typeof taskSyncWaitersRef.current = [];
+
+      taskSyncWaitersRef.current.forEach(({ resolve, sequence: waiterSequence }) => {
+        if (waiterSequence <= sequence) {
+          resolve(status);
+        } else {
+          remainingWaiters.push({ resolve, sequence: waiterSequence });
+        }
+      });
+
+      taskSyncWaitersRef.current = remainingWaiters;
+    },
+    [],
+  );
 
   const waitForNextTaskSync = useCallback(() => {
     if (!userId || !isDataLoaded) {
@@ -472,7 +492,11 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
     }
 
     return new Promise<TaskSyncStatus>((resolve) => {
-      taskSyncWaitersRef.current.push(resolve);
+      const nextSequence = Math.max(
+        taskSyncSequenceRef.current + 1,
+        lastCompletedTaskSyncRef.current + 1,
+      );
+      taskSyncWaitersRef.current.push({ resolve, sequence: nextSequence });
     });
   }, [userId, isDataLoaded]);
 
@@ -795,6 +819,9 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
       `[AppContext] Syncing ${changedTasks.length} updated tasks and ${deletedTaskIds.length} deletions`,
     );
 
+    taskSyncSequenceRef.current += 1;
+    const currentSequence = taskSyncSequenceRef.current;
+
     setTaskSyncStatus({ status: 'pending' });
 
     saveTasksToFirestore(userId, state.tasks, 1, {
@@ -817,7 +844,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
 
         const successStatus: TaskSyncStatus = { status: 'success' };
         setTaskSyncStatus(successStatus);
-        resolveTaskSyncWaiters(successStatus);
+        resolveTaskSyncWaiters(currentSequence, successStatus);
       })
       .catch((error) => {
         logger.error('[AppContext] Error saving tasks to Firestore:', error);
@@ -828,7 +855,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
             message: error.message,
           };
           setTaskSyncStatus(queuedStatus);
-          resolveTaskSyncWaiters(queuedStatus);
+          resolveTaskSyncWaiters(currentSequence, queuedStatus);
           return;
         }
 
@@ -841,7 +868,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
           message,
         };
         setTaskSyncStatus(errorStatus);
-        resolveTaskSyncWaiters(errorStatus);
+        resolveTaskSyncWaiters(currentSequence, errorStatus);
       });
   }, [state.tasks, userId, isDataLoaded]);
 
