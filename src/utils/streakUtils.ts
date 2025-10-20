@@ -86,17 +86,29 @@ export function mergeStreakStates(
   const currentDate = normalizeStoredDate(current.lastCompletedDate);
   const incomingDate = normalizeStoredDate(incoming.lastCompletedDate);
 
-  if (!incomingDate) {
-    // No persisted streak information to merge in
-    return { ...current };
-  }
-
   if (!currentDate) {
-    // Nothing tracked yet locally - take the incoming state as-is
+    // Nothing tracked yet locally - prefer the incoming data while keeping any
+    // locally recorded highs.
     return {
       ...DEFAULT_STREAK_STATE,
+      ...current,
       ...incoming,
+      currentStreak: Math.max(current.currentStreak, incoming.currentStreak),
       longestStreak: Math.max(current.longestStreak, incoming.longestStreak),
+      milestoneCelebration: mergeMilestone(incoming, current),
+    };
+  }
+
+  if (!incomingDate) {
+    const mergedLongestStreak = Math.max(
+      current.longestStreak,
+      incoming.longestStreak,
+    );
+
+    return {
+      ...current,
+      longestStreak: mergedLongestStreak,
+      milestoneCelebration: mergeMilestone(current, incoming),
     };
   }
 

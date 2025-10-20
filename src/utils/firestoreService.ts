@@ -24,7 +24,7 @@ import { Task } from '../types/task';
 import { Category } from '../types/task';
 import { UserPreferences } from '../types/user';
 import { convertTimestamps, prepareForFirestore } from './firestoreTransforms';
-import { normalizeRecurringDays } from './dateUtils';
+import { getDateKey, normalizeRecurringDays } from './dateUtils';
 import {
   saveTasks,
   loadTasks,
@@ -1056,13 +1056,21 @@ export async function loadStreakFromFirestore(
           }
         }
 
+        const rawLastCompleted = data.lastCompletedDate as unknown;
+        let lastCompletedDate: string | null = null;
+
+        if (typeof rawLastCompleted === 'string') {
+          lastCompletedDate = rawLastCompleted;
+        } else if (rawLastCompleted instanceof Timestamp) {
+          lastCompletedDate = getDateKey(rawLastCompleted.toDate());
+        } else if (rawLastCompleted instanceof Date) {
+          lastCompletedDate = getDateKey(rawLastCompleted);
+        }
+
         const streakState: StreakState = {
           currentStreak: Number(data.currentStreak) || 0,
           longestStreak: Number(data.longestStreak) || 0,
-          lastCompletedDate:
-            typeof data.lastCompletedDate === 'string'
-              ? data.lastCompletedDate
-              : null,
+          lastCompletedDate,
           milestoneCelebration,
         };
 

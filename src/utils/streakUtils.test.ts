@@ -56,6 +56,28 @@ describe('mergeStreakStates', () => {
   const yesterday = '2025-01-01';
   const today = '2025-01-02';
 
+  it('adopts incoming streak counts when there are no completion dates', () => {
+    const current = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 0,
+      longestStreak: 2,
+      lastCompletedDate: null,
+    };
+
+    const incoming = {
+      ...DEFAULT_STREAK_STATE,
+      currentStreak: 3,
+      longestStreak: 5,
+      lastCompletedDate: null,
+    };
+
+    const result = mergeStreakStates(current, incoming);
+
+    expect(result.currentStreak).toBe(3);
+    expect(result.longestStreak).toBe(5);
+    expect(result.lastCompletedDate).toBeNull();
+  });
+
   it('prefers the state with the more recent completion date', () => {
     const current = {
       ...DEFAULT_STREAK_STATE,
