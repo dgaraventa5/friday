@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, signInWithGoogle, logoutUser } from '../utils/firebase';
+import logger from '../utils/logger';
 import { User, AuthState, mapFirebaseUserToUser } from '../types/user';
 
 // Create the context with default values
@@ -31,11 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
-        // Debug log to track user authentication
         if (user) {
-          console.log('[Auth DEBUG] User authenticated with ID:', user.uid);
+          logger.log('[Auth] User authenticated with ID:', user.uid);
         } else {
-          console.log('[Auth DEBUG] No authenticated user');
+          logger.log('[Auth] No authenticated user');
         }
 
         setAuthState({
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       },
       (error) => {
-        console.error('Auth state change error:', error);
+        logger.error('Auth state change error:', error);
         setAuthState({
           user: null,
           loading: false,

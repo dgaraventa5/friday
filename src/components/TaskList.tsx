@@ -3,6 +3,8 @@
 // Used for both Today's Focus (inline mode) and Full Schedule (split mode).
 
 import { CheckCircle2, Sparkles } from 'lucide-react';
+import { useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Task } from '../types/task';
 import { TaskCard } from './TaskCard';
 import { getTodayKey, getDateKey } from '../utils/dateUtils';
@@ -16,6 +18,10 @@ interface TaskListProps {
   showCompletedInline?: boolean; // If true, show completed/incomplete together (Today's Focus)
 }
 
+type TaskListItem =
+  | { type: 'task'; task: Task }
+  | { type: 'header'; label: string };
+
 export function TaskList({
   tasks,
   onToggleComplete,
@@ -24,7 +30,10 @@ export function TaskList({
   showCompletedInline = false,
 }: TaskListProps) {
   // Split tasks into incomplete and completed
-  const incompleteTasks = tasks.filter((task) => !task.completed);
+  const incompleteTasks = useMemo(
+    () => tasks.filter((task) => !task.completed),
+    [tasks],
+  );
 
   // Get today's date as a string in YYYY-MM-DD format for comparison
   const todayDateString = getTodayKey();
@@ -45,25 +54,43 @@ export function TaskList({
 
         // Use the same string comparison approach for consistency
         const taskStartDateString = getDateKey(task.startDate);
-        const isToday = taskStartDateString === todayDateString;
-
-        // Debug logs for completed tasks filtering
-        console.log('[TaskList] Completed task:', task.name);
-        console.log('[TaskList] Task start date:', taskStartDateString);
-        console.log('[TaskList] Today date string:', todayDateString);
-        console.log('[TaskList] Is today?', isToday);
-
-        return isToday;
+        return taskStartDateString === todayDateString;
       });
 
   const allTasksCompleted =
     incompleteTasks.length === 0 && completedTasks.length > 0;
 
-  // Debug logging
-  console.log('TaskList - Tasks received:', tasks.length);
-  console.log('TaskList - Incomplete tasks:', incompleteTasks.length);
-  console.log('TaskList - Completed tasks:', completedTasks.length);
-  console.log('TaskList - Today date string:', todayDateString);
+  const listItems = useMemo(() => {
+    if (showCompletedInline) {
+      return tasks.map<TaskListItem>((task) => ({ type: 'task', task }));
+    }
+
+    const items: TaskListItem[] = incompleteTasks.map((task) => ({
+      type: 'task',
+      task,
+    }));
+
+    if (completedTasks.length > 0) {
+      items.push({
+        type: 'header',
+        label: `completed (${completedTasks.length})`,
+      });
+      completedTasks.forEach((task) => {
+        items.push({ type: 'task', task });
+      });
+    }
+
+    return items;
+  }, [showCompletedInline, tasks, incompleteTasks, completedTasks]);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: listItems.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: (index) =>
+      listItems[index]?.type === 'header' ? 48 : 124,
+    overscan: 8,
+  });
 
   // Show empty state if no tasks
   if (tasks.length === 0) {
@@ -122,53 +149,67 @@ export function TaskList({
           </h2>
         </div>
 
-        <div className="mt-2 sm:mt-3 flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 sm:gap-3 pb-4 pr-1">
-          {/* Inline mode: show all tasks in order, completed and incomplete (Today's Focus) */}
-          {showCompletedInline ? (
-            tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onToggleComplete={onToggleComplete}
-                onEdit={onEdit}
-              />
-            ))
-          ) : (
-            <>
-              {/* Incomplete Tasks (Full Schedule) */}
-              {incompleteTasks.length > 0 && (
-                <div className="flex flex-col gap-2 sm:gap-3">
-                  {incompleteTasks.map((task) => (
+        <div
+          ref={scrollContainerRef}
+          className="mt-2 sm:mt-3 flex-1 min-h-0 overflow-y-auto pb-4 pr-1"
+        >
+          <div
+            style={{
+              height: virtualizer.getTotalSize(),
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const item = listItems[virtualRow.index];
+              if (!item) {
+                return null;
+              }
+
+              const baseClassName = (() => {
+                if (item.type === 'header') {
+                  return 'pt-2 sm:pt-3 border-t border-neutral-100';
+                }
+
+                return [
+                  'pb-2 sm:pb-3',
+                  !showCompletedInline && item.task.completed
+                    ? 'opacity-75'
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+              })();
+
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  className={baseClassName}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  {item.type === 'header' ? (
+                    <h3 className="text-xs uppercase tracking-wide text-neutral-500 mb-1.5 sm:text-sm">
+                      {item.label}
+                    </h3>
+                  ) : (
                     <TaskCard
-                      key={task.id}
-                      task={task}
+                      task={item.task}
                       onToggleComplete={onToggleComplete}
                       onEdit={onEdit}
                     />
-                  ))}
+                  )}
                 </div>
-              )}
-
-              {/* Completed Tasks (Full Schedule) */}
-              {completedTasks.length > 0 && (
-                <div className="pt-2 sm:pt-3 border-t border-neutral-100">
-                  <h3 className="text-xs uppercase tracking-wide text-neutral-500 mb-1.5 sm:text-sm">
-                    completed ({completedTasks.length})
-                  </h3>
-                  <div className="flex flex-col gap-2 sm:gap-3 opacity-75">
-                    {completedTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onToggleComplete={onToggleComplete}
-                        onEdit={onEdit}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+              );
+            })}
+          </div>
         </div>
       </div>
     </PageLayout>

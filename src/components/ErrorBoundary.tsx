@@ -1,5 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from './Button';
+import logger from '../utils/logger';
 
 interface Props {
   children: ReactNode;
@@ -25,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
+    logger.error('Uncaught error:', error, errorInfo);
   }
 
   public render() {

@@ -6,6 +6,7 @@ import {
   convertTimestamps,
 } from './firestoreService';
 import { saveTasks, loadTasks } from './localStorage';
+import logger from './logger';
 
 /**
  * Force syncs tasks from Firestore for a specific user
@@ -14,7 +15,7 @@ import { saveTasks, loadTasks } from './localStorage';
 export async function forceSyncTasksFromFirestore(
   userId: string,
 ): Promise<Task[]> {
-  console.log('[Firestore] Force syncing tasks for user:', userId);
+  logger.log('[Firestore] Force syncing tasks for user:', userId);
 
   try {
     const database = await getFirestoreDb();
@@ -23,7 +24,7 @@ export async function forceSyncTasksFromFirestore(
     const q = query(tasksRef, where('userId', '==', userId));
     const querySnapshot = await getDocs(q);
 
-    console.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
+    logger.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
 
     // Process the results with duplicate detection
     const tasks: Task[] = [];
@@ -40,13 +41,13 @@ export async function forceSyncTasksFromFirestore(
         taskIds.add(taskWithoutUserId.id);
         tasks.push(taskWithoutUserId as Task);
       } else {
-        console.warn(
+        logger.warn(
           `[Firestore] Duplicate task ID detected: ${taskWithoutUserId.id}, skipping`,
         );
       }
     });
 
-    console.log(
+    logger.log(
       `[Firestore] Returning ${tasks.length} unique tasks (filtered from ${querySnapshot.size})`,
     );
 
@@ -62,12 +63,12 @@ export async function forceSyncTasksFromFirestore(
 
     return tasks;
   } catch (error) {
-    console.error('[Firestore] Force sync failed:', error);
+    logger.error('[Firestore] Force sync failed:', error);
 
     // Fall back to local storage if Firestore fails
     const userPrefix = `user_${userId}_`;
     const localTasks = loadTasks(userPrefix);
-    console.log(`[Firestore] Falling back to ${localTasks.length} local tasks`);
+    logger.log(`[Firestore] Falling back to ${localTasks.length} local tasks`);
     return localTasks;
   }
 }
