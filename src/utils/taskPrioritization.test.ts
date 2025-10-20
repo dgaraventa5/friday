@@ -3,6 +3,7 @@ import {
   DEFAULT_CATEGORY_LIMITS,
   checkCategoryLimits,
   normalizeCategoryLimits,
+  DEFAULT_DAILY_MAX_HOURS,
 } from './taskPrioritization';
 import { Category, Task } from '../types/task';
 import { getDateKey, normalizeDate } from './dateUtils';
@@ -54,6 +55,7 @@ describe('assignStartDates with recurring tasks', () => {
       [recurringTaskSep3, recurringTaskSep4],
       4,
       DEFAULT_CATEGORY_LIMITS,
+      DEFAULT_DAILY_MAX_HOURS,
       baseDate,
     );
 
@@ -104,6 +106,7 @@ describe('assignStartDates schedule horizon', () => {
       processedTasks,
       4,
       DEFAULT_CATEGORY_LIMITS,
+      DEFAULT_DAILY_MAX_HOURS,
       baseDate,
     );
 
@@ -187,6 +190,7 @@ describe('assignStartDates category limits', () => {
       [completedHomeTask, pendingHomeTask, workTask],
       4,
       DEFAULT_CATEGORY_LIMITS,
+      DEFAULT_DAILY_MAX_HOURS,
       baseDate,
     );
 
@@ -264,6 +268,7 @@ describe('assignStartDates due tasks vs future high priority tasks', () => {
       [completedBlocker, lowImportanceDueTomorrow, highImportanceNextWeek],
       1,
       DEFAULT_CATEGORY_LIMITS,
+      DEFAULT_DAILY_MAX_HOURS,
       baseDate,
     );
 
@@ -291,6 +296,10 @@ describe('checkCategoryLimits', () => {
     icon: 'briefcase',
   } as const;
 
+  const categoryLimits = {
+    Work: { weekdayMax: 2, weekendMax: 1 },
+  };
+
   const createTask = (id: string, date: Date): Task => ({
     id,
     name: `Task ${id}`,
@@ -305,38 +314,42 @@ describe('checkCategoryLimits', () => {
     estimatedHours: 1,
   });
 
+  beforeAll(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2025-02-03T12:00:00Z'));
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   it('blocks additional tasks due today when the category limit is reached', () => {
-    const today = normalizeDate(new Date());
+    const today = normalizeDate(new Date('2025-02-03')); // Monday
 
     const tasks: Task[] = [createTask('1', today), createTask('2', today)];
     const newTask = createTask('3', today);
 
-    const result = checkCategoryLimits(tasks, newTask);
+    const result = checkCategoryLimits(tasks, newTask, categoryLimits);
 
     expect(result.allowed).toBe(false);
-    expect(result.message).toContain("daily limit");
+    expect(result.message).toContain('daily hour limit');
   });
 
   it('allows tasks scheduled for future dates even when today has reached the limit', () => {
-    const today = normalizeDate(new Date());
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const normalizedTomorrow = normalizeDate(tomorrow);
+    const today = normalizeDate(new Date('2025-02-03'));
+    const normalizedTomorrow = normalizeDate(new Date('2025-02-04'));
 
     const tasks: Task[] = [createTask('1', today), createTask('2', today)];
     const futureTask = createTask('3', normalizedTomorrow);
 
-    const result = checkCategoryLimits(tasks, futureTask);
+    const result = checkCategoryLimits(tasks, futureTask, categoryLimits);
 
     expect(result.allowed).toBe(true);
     expect(result.message).toBeUndefined();
   });
 
   it('allows future due dates even when the start date is today', () => {
-    const today = normalizeDate(new Date());
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const normalizedTomorrow = normalizeDate(tomorrow);
+    const today = normalizeDate(new Date('2025-02-03'));
+    const normalizedTomorrow = normalizeDate(new Date('2025-02-04'));
 
     const tasks: Task[] = [createTask('1', today), createTask('2', today)];
     const futureTaskWithTodayStart: Task = {
@@ -344,7 +357,11 @@ describe('checkCategoryLimits', () => {
       dueDate: normalizedTomorrow,
     };
 
-    const result = checkCategoryLimits(tasks, futureTaskWithTodayStart);
+    const result = checkCategoryLimits(
+      tasks,
+      futureTaskWithTodayStart,
+      categoryLimits,
+    );
 
     expect(result.allowed).toBe(true);
     expect(result.message).toBeUndefined();
@@ -352,6 +369,23 @@ describe('checkCategoryLimits', () => {
     expect(futureTaskWithTodayStart.dueDate.getTime()).toBe(
       normalizedTomorrow.getTime(),
     );
+  });
+
+  it('uses weekend hour limits from preferences when evaluating new tasks', () => {
+    jest.setSystemTime(new Date('2025-02-01T12:00:00Z'));
+    const saturday = normalizeDate(new Date('2025-02-01')); // Saturday
+
+    const tasks: Task[] = [
+      createTask('1', saturday),
+      { ...createTask('2', saturday), estimatedHours: 0.5 },
+    ];
+    const newTask = { ...createTask('3', saturday), estimatedHours: 0.75 };
+
+    const result = checkCategoryLimits(tasks, newTask, categoryLimits);
+
+    expect(result.allowed).toBe(false);
+    expect(result.message).toContain('daily hour limit');
+    jest.setSystemTime(new Date('2025-02-03T12:00:00Z'));
   });
 });
 
@@ -394,7 +428,13 @@ describe('assignStartDates category limits', () => {
       Home: { weekdayMax: 5, weekendMax: 1 },
     };
 
-    const assigned = assignStartDates(tasks, 4, customLimits, saturday);
+    const assigned = assignStartDates(
+      tasks,
+      4,
+      customLimits,
+      DEFAULT_DAILY_MAX_HOURS,
+      saturday,
+    );
 
     const weekendAssignments = assigned.filter((task) => {
       const key = getDateKey(task.startDate);
@@ -429,7 +469,13 @@ describe('assignStartDates category limits', () => {
       Home: { weekdayMax: 2, weekendMax: 0 },
     };
 
-    const assigned = assignStartDates(tasks, 4, customLimits, monday);
+    const assigned = assignStartDates(
+      tasks,
+      4,
+      customLimits,
+      DEFAULT_DAILY_MAX_HOURS,
+      monday,
+    );
 
     const mondayAssignments = assigned.filter(
       (task) => getDateKey(task.startDate) === getDateKey(monday),
@@ -457,7 +503,13 @@ describe('assignStartDates category limits', () => {
       Home: { weekdayMax: 4, weekendMax: 5 },
     };
 
-    const assigned = assignStartDates(tasks, 10, customLimits, saturday);
+    const assigned = assignStartDates(
+      tasks,
+      10,
+      customLimits,
+      DEFAULT_DAILY_MAX_HOURS,
+      saturday,
+    );
 
     const saturdayHours = assigned
       .filter((task) => getDateKey(task.startDate) === getDateKey(saturday))
@@ -476,5 +528,110 @@ describe('assignStartDates category limits', () => {
 
     expect(normalized.Home.weekdayMax).toBe(6);
     expect(normalized.Home.weekendMax).toBe(2);
+  });
+});
+
+describe('assignStartDates daily max hours', () => {
+  const baseCategory: Category = {
+    id: 'focus',
+    name: 'Focus',
+    color: '#ff9900',
+    icon: 'target',
+    dailyLimit: 4,
+  };
+
+  const buildTask = (
+    id: string,
+    dueDate: Date,
+    estimatedHours: number,
+  ): Task => ({
+    id,
+    name: `Task ${id}`,
+    category: baseCategory,
+    importance: 'important',
+    urgency: 'urgent',
+    dueDate,
+    startDate: dueDate,
+    createdAt: dueDate,
+    updatedAt: dueDate,
+    completed: false,
+    estimatedHours,
+  });
+
+  it('respects weekday daily max hours when scheduling tasks', () => {
+    const monday = normalizeDate(new Date('2025-02-03T00:00:00Z'));
+    const tuesday = normalizeDate(new Date('2025-02-04T00:00:00Z'));
+    const wednesday = normalizeDate(new Date('2025-02-05T00:00:00Z'));
+
+    const tasks: Task[] = [
+      buildTask('weekday-1', tuesday, 2),
+      buildTask('weekday-2', tuesday, 2),
+      buildTask('weekday-3', wednesday, 1),
+    ];
+
+    const dailyMaxHours = { weekday: 3, weekend: 6 };
+
+    const scheduled = assignStartDates(
+      tasks,
+      4,
+      DEFAULT_CATEGORY_LIMITS,
+      dailyMaxHours,
+      monday,
+    );
+
+    const mondayKey = getDateKey(monday);
+    const mondayAssignments = scheduled.filter(
+      (task) => getDateKey(task.startDate) === mondayKey,
+    );
+
+    const totalMondayHours = mondayAssignments.reduce(
+      (sum, task) => sum + (task.estimatedHours || 1),
+      0,
+    );
+
+    expect(totalMondayHours).toBeLessThanOrEqual(dailyMaxHours.weekday);
+    expect(mondayAssignments.some((task) => task.id === 'weekday-2')).toBe(
+      false,
+    );
+    const deferredTask = scheduled.find((task) => task.id === 'weekday-2');
+    expect(deferredTask).toBeDefined();
+    expect(getDateKey(deferredTask!.startDate)).toBe(getDateKey(tuesday));
+  });
+
+  it('applies weekend daily max hours to weekend scheduling', () => {
+    const saturday = normalizeDate(new Date('2025-02-01T00:00:00Z'));
+    const monday = normalizeDate(new Date('2025-02-03T00:00:00Z'));
+
+    const tasks: Task[] = [
+      buildTask('weekend-1', monday, 1),
+      buildTask('weekend-2', monday, 1),
+      buildTask('weekend-3', monday, 1),
+    ];
+
+    const dailyMaxHours = { weekday: 6, weekend: 2 };
+
+    const scheduled = assignStartDates(
+      tasks,
+      4,
+      DEFAULT_CATEGORY_LIMITS,
+      dailyMaxHours,
+      saturday,
+    );
+
+    const saturdayKey = getDateKey(saturday);
+    const saturdayAssignments = scheduled.filter(
+      (task) => getDateKey(task.startDate) === saturdayKey,
+    );
+
+    const totalSaturdayHours = saturdayAssignments.reduce(
+      (sum, task) => sum + (task.estimatedHours || 1),
+      0,
+    );
+
+    expect(totalSaturdayHours).toBeLessThanOrEqual(dailyMaxHours.weekend);
+    expect(saturdayAssignments.length).toBeLessThan(tasks.length);
+    const deferredTask = scheduled.find((task) => task.id === 'weekend-3');
+    expect(deferredTask).toBeDefined();
+    expect(getDateKey(deferredTask!.startDate)).not.toBe(saturdayKey);
   });
 });

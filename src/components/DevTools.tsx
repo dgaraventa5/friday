@@ -19,6 +19,7 @@ export function DevTools() {
     tasks,
     4,
     preferences.categoryLimits,
+    preferences.dailyMaxHours,
   );
 
   // Get today's and tomorrow's date keys

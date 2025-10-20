@@ -60,7 +60,11 @@ export function OnboardingFlow() {
 
   const handleAddTask = async (task: Task): Promise<AddTaskResult> => {
     trackEvent('onboarding.button_click', { step: 5 });
-    const limitCheck = checkCategoryLimits(state.tasks, task);
+    const limitCheck = checkCategoryLimits(
+      state.tasks,
+      task,
+      state.preferences.categoryLimits,
+    );
     if (!limitCheck.allowed) {
       return { success: false, message: limitCheck.message };
     }
