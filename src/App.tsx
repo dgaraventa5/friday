@@ -10,7 +10,6 @@ import { WelcomeMessage } from './components/WelcomeMessage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { TaskErrorBoundary } from './components/TaskErrorBoundary';
 import { LoadingOverlay } from './components/LoadingOverlay';
-import { LoadingState } from './components/LoadingState';
 import { Task, AddTaskResult } from './types/task';
 import { useState, useEffect, useRef } from 'react';
 import { isToday } from 'date-fns';
@@ -367,9 +366,7 @@ function AppContent() {
             {/* Main task list (today's focus or full schedule) */}
             <ErrorBoundary>
               <TaskErrorBoundary>
-                {ui.isLoading ? (
-                  <LoadingState message="Loading tasks..." />
-                ) : ui.currentPage === 'schedule' ? (
+                {ui.isLoading ? null : ui.currentPage === 'schedule' ? (
                   <SchedulePage
                     tasks={assignedTasks}
                     onToggleComplete={handleToggleComplete}
