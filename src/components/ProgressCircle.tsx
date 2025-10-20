@@ -25,8 +25,19 @@ export const ProgressCircle: React.FC<ProgressCircleProps> = ({
   const progress = total > 0 ? completed / total : 0;
   // Offset for the progress arc
   const offset = circumference * (1 - progress);
-  // Percent for display
-  const percent = Math.round(progress * 100);
+  // Percent for display (clamped to 0-100)
+  const percent = Math.max(0, Math.min(100, Math.round(progress * 100)));
+  const percentText = `${percent}%`;
+
+  // Adjust the font size so longer strings like "100%" stay within the circle
+  const baseFontRatio = 0.32;
+  const decrementPerExtraChar = 0.04;
+  const minFontRatio = 0.24;
+  const fontRatio = Math.max(
+    minFontRatio,
+    baseFontRatio - Math.max(0, percentText.length - 2) * decrementPerExtraChar,
+  );
+  const fontSize = size * fontRatio;
 
   return (
     <svg width={size} height={size} className={className}>
@@ -58,11 +69,11 @@ export const ProgressCircle: React.FC<ProgressCircleProps> = ({
         y="50%"
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={size * 0.32}
+        fontSize={fontSize}
         fontWeight="bold"
         fill="#2563eb"
       >
-        {percent}%
+        {percentText}
       </text>
     </svg>
   );
