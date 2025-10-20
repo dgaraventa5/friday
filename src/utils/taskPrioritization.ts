@@ -621,9 +621,18 @@ export function assignStartDates(
 
     // Any remaining unassigned tasks go to the next day
     const nextDayTasks = [...unassigned];
-    // If nothing could be scheduled for a non-weekend day, break to avoid infinite loop
+    // If nothing could be scheduled for the day, break to avoid infinite loop when no capacity exists
     if (currentBucket.length === 0 && unassigned.length === nextDayTasks.length) {
-      if (!isWknd && availableDailyHours > 0 && remainingCapacity > 0) {
+      const noDailyCapacityConfigured =
+        resolvedDailyMaxHours.weekday <= 0 && resolvedDailyMaxHours.weekend <= 0;
+
+      if (
+        noDailyCapacityConfigured ||
+        (!isWknd && availableDailyHours > 0 && remainingCapacity > 0)
+      ) {
+        logger.log(
+          `Day ${dayOffset}: stopping scheduling - no capacity available for remaining tasks`,
+        );
         break;
       }
     }
