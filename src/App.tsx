@@ -102,6 +102,7 @@ function AppContent() {
     tasks,
     4,
     state.preferences.categoryLimits,
+    state.preferences.dailyMaxHours,
   );
 
   // Get today's date as a string in YYYY-MM-DD format for comparison
@@ -171,7 +172,11 @@ function AppContent() {
 
   // Add a new task and handle onboarding flag
   const handleAddTask = async (task: Task): Promise<AddTaskResult> => {
-    const limitCheck = checkCategoryLimits(tasks, task);
+    const limitCheck = checkCategoryLimits(
+      tasks,
+      task,
+      state.preferences.categoryLimits,
+    );
     if (!limitCheck.allowed) {
       return { success: false, message: limitCheck.message };
     }

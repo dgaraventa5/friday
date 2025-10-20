@@ -130,6 +130,7 @@ export function getTopDailyTasks(tasks: Task[], maxTasks: number = 4): Task[] {
 export function checkCategoryLimits(
   tasks: Task[],
   newTask: Task,
+  categoryLimits: Record<string, CategoryHourLimit> = DEFAULT_CATEGORY_LIMITS,
 ): { allowed: boolean; message?: string } {
   const getRelevantDate = (task: Task) => task.startDate ?? task.dueDate;
   const isFutureDueDate = (date?: Date | null) => {
@@ -154,6 +155,11 @@ export function checkCategoryLimits(
     return { allowed: true };
   }
 
+  const categoryName = newTask.category?.name;
+  if (!categoryName) {
+    return { allowed: true };
+  }
+
   const todayTasks = tasks.filter((task) => {
     if (task.completed || task.category.id !== newTask.category.id) {
       return false;
@@ -167,10 +173,40 @@ export function checkCategoryLimits(
     return !!taskDate && isToday(taskDate);
   });
 
-  if (todayTasks.length >= newTask.category.dailyLimit) {
+  const limitSource =
+    categoryLimits[categoryName] || DEFAULT_CATEGORY_LIMITS[categoryName];
+
+  if (!limitSource) {
+    return { allowed: true };
+  }
+
+  const weekdayLimit =
+    typeof limitSource.weekdayMax === 'number'
+      ? limitSource.weekdayMax
+      : Number.POSITIVE_INFINITY;
+  const weekendLimit =
+    typeof limitSource.weekendMax === 'number'
+      ? limitSource.weekendMax
+      : weekdayLimit;
+  const applicableLimit = isWeekend(newTaskDate)
+    ? weekendLimit
+    : weekdayLimit;
+
+  if (!Number.isFinite(applicableLimit)) {
+    return { allowed: true };
+  }
+
+  const usedHours = todayTasks.reduce((total, task) => {
+    const estimated = task.estimatedHours ?? 1;
+    return total + estimated;
+  }, 0);
+
+  const newTaskHours = newTask.estimatedHours ?? 1;
+
+  if (usedHours + newTaskHours > applicableLimit) {
     return {
       allowed: false,
-      message: `You've reached your daily limit of ${newTask.category.dailyLimit} tasks for ${newTask.category.name}. Focus on completing existing tasks first.`,
+      message: `You've reached your daily hour limit of ${applicableLimit} for ${categoryName}. Focus on completing existing tasks first.`,
     };
   }
 
@@ -307,8 +343,22 @@ export function assignStartDates(
   tasks: Task[],
   maxPerDay: number = 4,
   categoryLimits: Record<string, CategoryHourLimit> = DEFAULT_CATEGORY_LIMITS,
+  dailyMaxHours: DailyHourLimits = DEFAULT_DAILY_MAX_HOURS,
   baseDate?: Date,
 ): Task[] {
+  const resolvedDailyMaxHours: DailyHourLimits = {
+    weekday:
+      typeof dailyMaxHours?.weekday === 'number'
+        ? dailyMaxHours.weekday
+        : DEFAULT_DAILY_MAX_HOURS.weekday,
+    weekend:
+      typeof dailyMaxHours?.weekend === 'number'
+        ? dailyMaxHours.weekend
+        : typeof dailyMaxHours?.weekday === 'number'
+        ? dailyMaxHours.weekday
+        : DEFAULT_DAILY_MAX_HOURS.weekend,
+  };
+
   // First, normalize all dates to startOfDay for consistency
   const normalizedTasks = tasks.map((task) => ({
     ...task,
@@ -321,6 +371,7 @@ export function assignStartDates(
   // Get completed tasks by day to count them against the daily limit
   const completedTasksByDay = new Map<string, number>();
   const completedCategoryHoursByDay = new Map<string, Record<string, number>>();
+  const completedTotalHoursByDay = new Map<string, number>();
   normalizedTasks
     .filter((task) => task.completed)
     .forEach((task) => {
@@ -335,6 +386,10 @@ export function assignStartDates(
       const categoryMap = completedCategoryHoursByDay.get(dateKey) || {};
       categoryMap[cat] = (categoryMap[cat] || 0) + hours;
       completedCategoryHoursByDay.set(dateKey, categoryMap);
+      completedTotalHoursByDay.set(
+        dateKey,
+        (completedTotalHoursByDay.get(dateKey) || 0) + hours,
+      );
     });
 
   // Separate recurring and non-recurring tasks
@@ -414,6 +469,24 @@ export function assignStartDates(
     }
   }
 
+  const recurringCategoryHoursByDay = new Map<string, Record<string, number>>();
+  const recurringTotalHoursByDay = new Map<string, number>();
+  recurringAssignments.forEach((task) => {
+    if (!task.startDate) {
+      return;
+    }
+    const dateKey = getDateKey(task.startDate);
+    const cat = task.category?.name || 'Other';
+    const hours = task.estimatedHours || 1;
+    const categoryHours = recurringCategoryHoursByDay.get(dateKey) || {};
+    categoryHours[cat] = (categoryHours[cat] || 0) + hours;
+    recurringCategoryHoursByDay.set(dateKey, categoryHours);
+    recurringTotalHoursByDay.set(
+      dateKey,
+      (recurringTotalHoursByDay.get(dateKey) || 0) + hours,
+    );
+  });
+
   // Now process non-recurring tasks with the remaining capacity
   while (unassigned.length > 0) {
     const currentDate = new Date(today);
@@ -429,6 +502,17 @@ export function assignStartDates(
 
     // Count completed tasks for this day
     const completedTasksCount = completedTasksByDay.get(dateKey) || 0;
+
+    const applicableDailyCap = isWknd
+      ? resolvedDailyMaxHours.weekend
+      : resolvedDailyMaxHours.weekday;
+    const completedHoursForDay = completedTotalHoursByDay.get(dateKey) || 0;
+    const recurringHoursForDay = recurringTotalHoursByDay.get(dateKey) || 0;
+    let totalHoursForDay = completedHoursForDay + recurringHoursForDay;
+    const availableDailyHours = Math.max(
+      0,
+      applicableDailyCap - totalHoursForDay,
+    );
 
     // Calculate remaining capacity for this day, accounting for completed tasks
     const remainingCapacity = Math.max(
@@ -450,9 +534,19 @@ export function assignStartDates(
     );
 
     const currentBucket: typeof scoredNonRecurring = [];
-    const categoryHours: Record<string, number> = {
-      ...(completedCategoryHoursByDay.get(dateKey) || {}),
-    };
+    const categoryHours: Record<string, number> = {};
+    const completedCategoryHours = completedCategoryHoursByDay.get(dateKey);
+    if (completedCategoryHours) {
+      for (const [cat, hours] of Object.entries(completedCategoryHours)) {
+        categoryHours[cat] = hours;
+      }
+    }
+    const recurringCategoryHours = recurringCategoryHoursByDay.get(dateKey);
+    if (recurringCategoryHours) {
+      for (const [cat, hours] of Object.entries(recurringCategoryHours)) {
+        categoryHours[cat] = (categoryHours[cat] || 0) + hours;
+      }
+    }
     let totalTasks = 0;
     let scheduledAny = true;
     const normalizedCurrentTime = normalizedCurrentDate.getTime();
@@ -503,9 +597,16 @@ export function assignStartDates(
           continue;
         }
 
+        const withinDailyLimit =
+          totalHoursForDay + estimatedHours <= applicableDailyCap;
+        if (!withinDailyLimit && !isDueNow) {
+          continue;
+        }
+
         currentBucket.push(task);
         categoryHours[cat] = used + estimatedHours;
         totalTasks++;
+        totalHoursForDay += estimatedHours;
         unassigned.splice(unassignedIndex, 1);
         scheduledAny = true;
         // Recalculate ordering after each assignment so due/overdue tasks always run first
@@ -520,12 +621,10 @@ export function assignStartDates(
     // Any remaining unassigned tasks go to the next day
     const nextDayTasks = [...unassigned];
     // If nothing could be scheduled for a non-weekend day, break to avoid infinite loop
-    if (
-      currentBucket.length === 0 &&
-      unassigned.length === nextDayTasks.length &&
-      !isWknd
-    ) {
-      break;
+    if (currentBucket.length === 0 && unassigned.length === nextDayTasks.length) {
+      if (!isWknd && availableDailyHours > 0 && remainingCapacity > 0) {
+        break;
+      }
     }
 
     // Always use normalized dates for consistent date handling
