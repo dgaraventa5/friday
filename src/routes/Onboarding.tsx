@@ -38,7 +38,7 @@ const steps = [
 
 export function OnboardingFlow() {
   const navigate = useNavigate();
-  const { state, dispatch } = useApp();
+  const { state, dispatch, waitForNextTaskSync } = useApp();
   const { categories } = state;
   const [step, setStep] = useState(1);
 
@@ -68,10 +68,33 @@ export function OnboardingFlow() {
     if (!limitCheck.allowed) {
       return { success: false, message: limitCheck.message };
     }
+    const syncPromise = waitForNextTaskSync();
     dispatch({ type: 'ADD_TASK', payload: task });
     trackEvent('onboarding.task_created');
-    setStep(6);
-    return { success: true };
+
+    const syncResult = await syncPromise;
+
+    if (syncResult.status === 'success') {
+      setStep(6);
+      return { success: true };
+    }
+
+    if (syncResult.status === 'queued') {
+      return {
+        success: true,
+        queued: true,
+        message:
+          syncResult.message ||
+          'Task saved locally. We will sync it when your connection improves.',
+      };
+    }
+
+    return {
+      success: false,
+      message:
+        syncResult.message ||
+        'We could not save your task to the cloud. Please try again.',
+    };
   };
 
   const handleFinish = () => {

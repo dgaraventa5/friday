@@ -85,6 +85,33 @@ type PendingRetry = {
 
 const pendingWriteRetries = new Map<string, PendingRetry>();
 
+const getUserPrefix = (userId: string) => `user_${userId}_`;
+const getUnsyncedTasksKey = (userId: string) => `${getUserPrefix(userId)}tasks_unsynced`;
+
+const getLatestUpdatedAt = (tasks: Task[]): number =>
+  tasks.reduce((latest, task) => {
+    const updatedAt = task.updatedAt
+      ? new Date(task.updatedAt).getTime()
+      : 0;
+    return Math.max(latest, updatedAt);
+  }, 0);
+
+export class FirestoreSyncError extends Error {
+  queued: boolean;
+
+  constructor(
+    message: string,
+    options: { queued?: boolean; cause?: unknown } = {},
+  ) {
+    super(message);
+    this.name = 'FirestoreSyncError';
+    this.queued = options.queued ?? false;
+    if (options.cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
+  }
+}
+
 const scheduleWriteRetry = (
   description: string,
   operation: (attempt: number) => Promise<void>,
@@ -352,6 +379,8 @@ export async function saveTasksToFirestore(
 ): Promise<void> {
   const { queued = false, changedTasks, deletedTaskIds = [] } = options;
   const description = `save tasks for user ${userId}`;
+  const userPrefix = getUserPrefix(userId);
+  const unsyncedKey = getUnsyncedTasksKey(userId);
 
   try {
     await tryFirestoreOperation(description, async (database) => {
@@ -428,23 +457,29 @@ export async function saveTasksToFirestore(
 
     // Save a timestamp of last successful Firestore sync
     localStorage.setItem(
-      `user_${userId}_last_firestore_sync`,
+      `${userPrefix}last_firestore_sync`,
       new Date().toISOString(),
     );
+    localStorage.removeItem(unsyncedKey);
   } catch (error) {
     logger.error('Error saving tasks to Firestore:', error);
 
     if (!queued) {
       logger.log('[Firestore] Falling back to localStorage for saving tasks');
-      saveTasks(tasks, `user_${userId}_`);
+      saveTasks(tasks, userPrefix);
     }
+
+    localStorage.setItem(unsyncedKey, 'true');
 
     if (attempt >= MAX_WRITE_RETRY_ATTEMPTS) {
       logger.error(
         `[Firestore] Giving up on ${description} after ${attempt} attempts`,
         error,
       );
-      return;
+      throw new FirestoreSyncError(
+        'We could not sync your latest changes to the cloud. Please check your connection and try again.',
+        { queued: false, cause: error },
+      );
     }
 
     scheduleWriteRetry(
@@ -456,12 +491,19 @@ export async function saveTasksToFirestore(
         }),
       attempt + 1,
     );
+
+    throw new FirestoreSyncError(
+      'Your changes are saved locally and will sync when the connection is restored.',
+      { queued: true, cause: error },
+    );
   }
 }
 
 // Load tasks from Firestore
 export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
-  const userPrefix = `user_${userId}_`;
+  const userPrefix = getUserPrefix(userId);
+  const unsyncedKey = getUnsyncedTasksKey(userId);
+  const hasUnsyncedFlag = localStorage.getItem(unsyncedKey) === 'true';
 
   try {
     logger.log(
@@ -535,6 +577,45 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
       logger.log(
         `[Firestore] Returning ${tasks.length} unique tasks (filtered from ${querySnapshot.size})`,
       );
+
+      const localTasks = loadTasks(userPrefix);
+
+      if (hasUnsyncedFlag && localTasks.length > 0) {
+        const localLatest = getLatestUpdatedAt(localTasks);
+        const remoteLatest = getLatestUpdatedAt(tasks);
+        const preferLocal =
+          localTasks.length > tasks.length || localLatest >= remoteLatest;
+
+        if (preferLocal) {
+          logger.log(
+            `[Firestore] Preserving ${localTasks.length} unsynced local tasks instead of overwriting with ${tasks.length} remote tasks`,
+          );
+
+          if (
+            typeof navigator !== 'undefined' &&
+            typeof navigator.onLine === 'boolean' &&
+            navigator.onLine
+          ) {
+            scheduleWriteRetry(
+              `sync local tasks for user ${userId}`,
+              (nextAttempt) =>
+                saveTasksToFirestore(userId, localTasks, nextAttempt, {
+                  queued: true,
+                }),
+              1,
+            );
+          }
+
+          return localTasks;
+        }
+
+        logger.log(
+          '[Firestore] Unsynced flag present but remote data appears newer; using remote snapshot and clearing flag',
+        );
+        localStorage.removeItem(unsyncedKey);
+      } else {
+        localStorage.removeItem(unsyncedKey);
+      }
 
       saveTasks(tasks, userPrefix);
       logger.log(

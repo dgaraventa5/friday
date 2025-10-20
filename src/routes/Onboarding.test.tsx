@@ -29,6 +29,8 @@ jest.mock('../context/AppContext', () => ({
       },
     },
     dispatch: jest.fn(),
+    taskSyncStatus: { status: 'idle' },
+    waitForNextTaskSync: jest.fn().mockResolvedValue({ status: 'success' }),
   }),
 }));
 
