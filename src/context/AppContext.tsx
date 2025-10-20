@@ -181,6 +181,7 @@ function syncRecurringSeries(
       : null;
 
   const today = normalizeDate(new Date());
+  const seriesUpdatedAt = normalizedUpdatedTask.updatedAt ?? new Date();
 
   return normalizedTasks.reduce<Task[]>((acc, task) => {
     const matchesSeries = belongsToRecurringSeries(task, seriesId);
@@ -227,6 +228,7 @@ function syncRecurringSeries(
           recurringEndCount: undefined,
           recurringCurrentCount: undefined,
           recurringSeriesId: undefined,
+          updatedAt: seriesUpdatedAt,
         });
       }
       return acc;
@@ -254,6 +256,7 @@ function syncRecurringSeries(
       recurringDays: normalizedUpdatedTask.recurringDays,
       recurringEndType: normalizedUpdatedTask.recurringEndType,
       recurringEndCount: normalizedUpdatedTask.recurringEndCount,
+      updatedAt: seriesUpdatedAt,
     });
 
     return acc;
