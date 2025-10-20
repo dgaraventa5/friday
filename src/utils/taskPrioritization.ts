@@ -586,7 +586,12 @@ export function assignStartDates(
         const used = categoryHours[cat] || 0;
         const estimatedHours = task.estimatedHours || 1;
         const isDueNow = task.dueDate.getTime() <= normalizedCurrentTime;
-        const canBypassLimits = isDueNow && !isWknd;
+        const isOverdue = task.dueDate.getTime() < normalizedCurrentTime;
+        const isDueToday = isSameNormalizedDay(
+          task.dueDate,
+          normalizedCurrentDate,
+        );
+        const canBypassLimits = isOverdue ? !isWknd : isDueToday;
 
         // Skip Work tasks on weekends only if they aren't due now
         if (isWknd && cat === 'Work' && !isDueNow) {
