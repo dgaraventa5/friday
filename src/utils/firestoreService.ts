@@ -25,6 +25,7 @@ import { Category } from '../types/task';
 import { UserPreferences } from '../types/user';
 import { convertTimestamps, prepareForFirestore } from './firestoreTransforms';
 import { getDateKey, normalizeRecurringDays } from './dateUtils';
+import { tasksCollection, tasksQueryForUser } from '../lib/tasksRef';
 import {
   saveTasks,
   loadTasks,
@@ -404,9 +405,10 @@ export async function saveTasksToFirestore(
       const batch = writeBatch(database);
       let hasWrites = false;
 
-      const tasksRef = collection(database, COLLECTIONS.TASKS);
-      const q = query(tasksRef, where('userId', '==', userId));
-      const querySnapshot = await getDocs(q);
+      const tasksRef = tasksCollection(database, userId);
+      const querySnapshot = await getDocs(
+        tasksQueryForUser(database, userId),
+      );
 
       const activeTaskIds = new Set(tasks.map((task) => task.id));
       const docIdsToDelete = new Set<string>();
@@ -429,13 +431,13 @@ export async function saveTasksToFirestore(
       });
 
       docIdsToDelete.forEach((docId) => {
-        const taskRef = doc(database, COLLECTIONS.TASKS, docId);
+        const taskRef = doc(tasksRef, docId);
         batch.delete(taskRef);
         hasWrites = true;
       });
 
       tasksToUpsert.forEach((task) => {
-        const taskRef = doc(database, COLLECTIONS.TASKS, task.id);
+        const taskRef = doc(tasksRef, task.id);
         const taskWithUser = {
           ...prepareForFirestore(task),
           userId,
@@ -516,9 +518,9 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
         `[Firestore] Loading tasks for user: ${userId} with persistence type: ${persistenceType}`,
       );
 
-      const tasksRef = collection(database, COLLECTIONS.TASKS);
-      const q = query(tasksRef, where('userId', '==', userId));
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocs(
+        tasksQueryForUser(database, userId),
+      );
 
       logger.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
 
@@ -1341,7 +1343,7 @@ export async function migrateTasksToFirestore(userId: string): Promise<void> {
       const batch = writeBatch(database);
 
       for (const task of localTasks) {
-        const taskRef = doc(collection(database, 'tasks'));
+        const taskRef = doc(tasksCollection(database, userId));
         const taskWithUser = {
           ...task,
           userId,
@@ -1379,10 +1381,7 @@ export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
     const database = await getDbOrThrow();
 
     logger.log(`[Firestore] Fetching tasks for user ${userId}`);
-    const tasksQuery = query(
-      collection(database, 'tasks'),
-      where('userId', '==', userId),
-    );
+    const tasksQuery = tasksQueryForUser(database, userId);
     const querySnapshot = await getDocs(tasksQuery);
 
     const tasks: Task[] = [];
@@ -1470,10 +1469,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
 
       // Fetch the latest tasks
       logger.log('[Firestore] Fetching latest data from server');
-      const tasksQuery = query(
-        collection(database, COLLECTIONS.TASKS),
-        where('userId', '==', userId),
-      );
+      const tasksQuery = tasksQueryForUser(database, userId);
 
       const querySnapshot = await getDocs(tasksQuery);
 
