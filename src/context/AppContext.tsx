@@ -489,9 +489,6 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
         const completedStatus = completedTaskSyncsRef.current.get(waiterSequence);
         if (completedStatus) {
           resolve(completedStatus);
-          if (waiterSequence <= lastCompletedTaskSyncRef.current) {
-            completedTaskSyncsRef.current.delete(waiterSequence);
-          }
         } else {
           remainingWaiters.push({ resolve, sequence: waiterSequence });
         }
