@@ -3,6 +3,8 @@ import {
   registerCompletion,
   DEFAULT_STREAK_STATE,
   mergeStreakStates,
+  loadStreakState,
+  STREAK_STORAGE_KEY,
 } from './streakUtils';
 import { parseLocalDateInput } from './dateUtils';
 
@@ -175,5 +177,72 @@ describe('mergeStreakStates', () => {
     expect(result.currentStreak).toBe(5);
     expect(result.longestStreak).toBe(6);
     expect(result.milestoneCelebration?.streak).toBe(5);
+  });
+});
+
+describe('loadStreakState', () => {
+  const createMockLocalStorage = () => {
+    let store = new Map<string, string>();
+
+    return {
+      getItem(key: string) {
+        return store.has(key) ? store.get(key)! : null;
+      },
+      setItem(key: string, value: string) {
+        store.set(key, value);
+      },
+      removeItem(key: string) {
+        store.delete(key);
+      },
+      clear() {
+        store = new Map();
+      },
+      key(index: number) {
+        return Array.from(store.keys())[index] ?? null;
+      },
+      get length() {
+        return store.size;
+      },
+    };
+  };
+
+  beforeEach(() => {
+    const mockLocalStorage = createMockLocalStorage();
+    (globalThis as typeof globalThis & { localStorage: Storage }).localStorage =
+      mockLocalStorage as unknown as Storage;
+    mockLocalStorage.clear();
+  });
+
+  it('ignores milestone celebrations without a timestamp', () => {
+    localStorage.setItem(
+      STREAK_STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_STREAK_STATE,
+        milestoneCelebration: { streak: 5 },
+      }),
+    );
+
+    const result = loadStreakState();
+
+    expect(result.milestoneCelebration).toBeNull();
+  });
+
+  it('restores valid milestone celebrations', () => {
+    const achievement = {
+      streak: 7,
+      achievedAt: '2025-10-20T12:00:00.000Z',
+    } as const;
+
+    localStorage.setItem(
+      STREAK_STORAGE_KEY,
+      JSON.stringify({
+        ...DEFAULT_STREAK_STATE,
+        milestoneCelebration: achievement,
+      }),
+    );
+
+    const result = loadStreakState();
+
+    expect(result.milestoneCelebration).toEqual(achievement);
   });
 });

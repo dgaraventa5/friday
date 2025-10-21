@@ -1102,17 +1102,31 @@ export async function saveStreakToFirestore(
   try {
     await tryFirestoreOperation(description, async (database) => {
       const streakRef = doc(database, COLLECTIONS.STREAKS, userId);
+      const sanitizedLastCompletedDate =
+        typeof streak.lastCompletedDate === 'string' && streak.lastCompletedDate
+          ? streak.lastCompletedDate
+          : null;
+
+      let milestoneCelebration: StreakState['milestoneCelebration'] = null;
+
+      if (streak.milestoneCelebration) {
+        const milestoneStreak = Number(streak.milestoneCelebration.streak) || 0;
+        const { achievedAt } = streak.milestoneCelebration;
+
+        if (milestoneStreak > 0 && typeof achievedAt === 'string' && achievedAt) {
+          milestoneCelebration = {
+            streak: milestoneStreak,
+            achievedAt,
+          };
+        }
+      }
+
       const payload = {
         userId,
         currentStreak: Number(streak.currentStreak) || 0,
         longestStreak: Number(streak.longestStreak) || 0,
-        lastCompletedDate: streak.lastCompletedDate || null,
-        milestoneCelebration: streak.milestoneCelebration
-          ? {
-              streak: Number(streak.milestoneCelebration.streak) || 0,
-              achievedAt: streak.milestoneCelebration.achievedAt,
-            }
-          : null,
+        lastCompletedDate: sanitizedLastCompletedDate,
+        milestoneCelebration,
         updatedAt: Timestamp.now(),
       };
 
