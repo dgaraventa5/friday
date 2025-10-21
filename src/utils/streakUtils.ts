@@ -25,6 +25,21 @@ export function loadStreakState(prefix: string = ''): StreakState {
 
   try {
     const parsed = JSON.parse(stored) as Partial<StreakState>;
+    const celebration = parsed.milestoneCelebration;
+    let milestoneCelebration: StreakState['milestoneCelebration'] = null;
+
+    if (celebration && typeof celebration === 'object') {
+      const { streak, achievedAt } = celebration as Record<string, unknown>;
+      const parsedStreak = Number(streak) || 0;
+
+      if (parsedStreak > 0 && typeof achievedAt === 'string' && achievedAt) {
+        milestoneCelebration = {
+          streak: parsedStreak,
+          achievedAt,
+        };
+      }
+    }
+
     return {
       ...DEFAULT_STREAK_STATE,
       ...parsed,
@@ -34,11 +49,7 @@ export function loadStreakState(prefix: string = ''): StreakState {
         typeof parsed.lastCompletedDate === 'string'
           ? parsed.lastCompletedDate
           : null,
-      milestoneCelebration:
-        parsed.milestoneCelebration &&
-        typeof parsed.milestoneCelebration === 'object'
-          ? parsed.milestoneCelebration
-          : null,
+      milestoneCelebration,
     };
   } catch (error) {
     logger.warn('[StreakUtils] Failed to parse streak state:', error);
