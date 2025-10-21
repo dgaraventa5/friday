@@ -24,6 +24,10 @@ import { Task } from '../types/task';
 import { Category } from '../types/task';
 import { UserPreferences } from '../types/user';
 import { convertTimestamps, prepareForFirestore } from './firestoreTransforms';
+import {
+  commitTaskOperationsInChunks,
+  TaskWriteOperation,
+} from './firestoreBatching';
 import { getDateKey, normalizeRecurringDays } from './dateUtils';
 import { tasksCollection, tasksQueryForUser } from '../lib/tasksRef';
 import {
@@ -402,9 +406,6 @@ export async function saveTasksToFirestore(
         `[Firestore] Preparing to persist ${tasksToUpsert.size} updated tasks and ${deletedTaskIds.length} deletions for user: ${userId} (attempt ${attempt})`,
       );
 
-      const batch = writeBatch(database);
-      let hasWrites = false;
-
       const tasksRef = tasksCollection(database, userId);
       const querySnapshot = await getDocs(
         tasksQueryForUser(database, userId),
@@ -430,29 +431,30 @@ export async function saveTasksToFirestore(
         docIdsToDelete.add(taskId);
       });
 
+      const operations: TaskWriteOperation[] = [];
+
       docIdsToDelete.forEach((docId) => {
-        const taskRef = doc(tasksRef, docId);
-        batch.delete(taskRef);
-        hasWrites = true;
+        operations.push({ type: 'delete', docId });
       });
 
       tasksToUpsert.forEach((task) => {
-        const taskRef = doc(tasksRef, task.id);
-        const taskWithUser = {
-          ...prepareForFirestore(task),
-          userId,
-        };
-
-        batch.set(taskRef, taskWithUser, { merge: true });
-        hasWrites = true;
+        operations.push({ type: 'set', task });
       });
 
-      if (!hasWrites) {
+      if (operations.length === 0) {
         logger.log('[Firestore] No task changes detected; skipping commit');
         return;
       }
 
-      await batch.commit();
+      await commitTaskOperationsInChunks(operations, {
+        createBatch: () => writeBatch(database),
+        getDeleteRef: (docId) => doc(tasksRef, docId),
+        getSetRef: (taskId) => doc(tasksRef, taskId),
+        toFirestoreTask: (task) => ({
+          ...prepareForFirestore(task),
+          userId,
+        }),
+      });
     });
 
     logger.log('[Firestore] Task changes committed successfully');
