@@ -459,6 +459,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   const taskSyncWaitersRef = useRef<
     { resolve: (status: TaskSyncStatus) => void; sequence: number }[]
   >([]);
+  const pendingInitialSyncRef = useRef(false);
 
   const resolveTaskSyncWaiters = useCallback(
     (sequence: number, status: TaskSyncStatus) => {
@@ -487,16 +488,24 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   );
 
   const waitForNextTaskSync = useCallback(() => {
-    if (!userId || !isDataLoaded) {
-      return Promise.resolve<TaskSyncStatus>({ status: 'success' });
+    if (!userId) {
+      return Promise.resolve<TaskSyncStatus>({
+        status: 'error',
+        message: 'You must be signed in to sync tasks.',
+      });
     }
 
     return new Promise<TaskSyncStatus>((resolve) => {
-      const nextSequence = Math.max(
-        taskSyncSequenceRef.current + 1,
-        lastCompletedTaskSyncRef.current + 1,
-      );
+      const nextSequence = isDataLoaded
+        ? Math.max(
+            taskSyncSequenceRef.current + 1,
+            lastCompletedTaskSyncRef.current + 1,
+          )
+        : lastCompletedTaskSyncRef.current;
       taskSyncWaitersRef.current.push({ resolve, sequence: nextSequence });
+      if (!isDataLoaded) {
+        pendingInitialSyncRef.current = true;
+      }
     });
   }, [userId, isDataLoaded]);
 
@@ -531,6 +540,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   useEffect(() => {
     lastSyncedTasksRef.current = new Map();
     hasInitializedTaskSyncRef.current = false;
+    pendingInitialSyncRef.current = false;
 
     if (userId) {
       logger.log('[AppContext] Loading data for user:', userId);
@@ -774,7 +784,12 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
 
   // Save tasks to Firestore when they change
   useEffect(() => {
-    if (!userId || !isDataLoaded) {
+    if (!userId) {
+      return;
+    }
+
+    if (!isDataLoaded) {
+      pendingInitialSyncRef.current = true;
       return;
     }
 
@@ -792,10 +807,18 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
       ]),
     );
 
-    if (!hasInitializedTaskSyncRef.current) {
-      lastSyncedTasksRef.current = nextSnapshot;
+    const firstSync = !hasInitializedTaskSyncRef.current;
+    const hadPendingInitialSync = pendingInitialSyncRef.current;
+    if (firstSync) {
       hasInitializedTaskSyncRef.current = true;
-      return;
+      if (!hadPendingInitialSync) {
+        lastSyncedTasksRef.current = nextSnapshot;
+        resolveTaskSyncWaiters(taskSyncSequenceRef.current, {
+          status: 'success',
+        });
+        return;
+      }
+      pendingInitialSyncRef.current = false;
     }
 
     const changedTasks = state.tasks.filter((task) => {
@@ -812,6 +835,11 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
     );
 
     if (changedTasks.length === 0 && deletedTaskIds.length === 0) {
+      if (firstSync && hadPendingInitialSync) {
+        resolveTaskSyncWaiters(taskSyncSequenceRef.current, {
+          status: 'success',
+        });
+      }
       return;
     }
 
@@ -841,6 +869,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
         });
 
         lastSyncedTasksRef.current = updatedSnapshot;
+        pendingInitialSyncRef.current = false;
 
         const successStatus: TaskSyncStatus = { status: 'success' };
         setTaskSyncStatus(successStatus);
@@ -869,6 +898,7 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
         };
         setTaskSyncStatus(errorStatus);
         resolveTaskSyncWaiters(currentSequence, errorStatus);
+        pendingInitialSyncRef.current = true;
       });
   }, [state.tasks, userId, isDataLoaded]);
 

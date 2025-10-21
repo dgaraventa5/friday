@@ -256,5 +256,85 @@ describe('AppProvider task migration', () => {
       ),
     );
   });
+
+  it('persists tasks added before the initial Firestore load resolves', async () => {
+    const category: Category = {
+      id: 'cat-before-load',
+      name: 'Temp',
+      color: '#123456',
+      dailyLimit: 1,
+      icon: 'clock',
+    };
+    const pendingTask: Task = {
+      id: 'task-before-load',
+      name: 'Pending while loading',
+      category,
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: new Date('2024-01-02T00:00:00.000Z'),
+      estimatedHours: 1,
+      completed: false,
+      createdAt: new Date('2024-01-02T00:00:00.000Z'),
+      updatedAt: new Date('2024-01-02T00:00:00.000Z'),
+      startDate: new Date('2024-01-02T00:00:00.000Z'),
+    };
+
+    let resolveTasks: ((value: Task[]) => void) | null = null;
+
+    mockLoadTasksFromFirestore.mockImplementation(
+      () =>
+        new Promise<Task[]>((resolve) => {
+          resolveTasks = resolve;
+        }),
+    );
+    mockLoadCategoriesFromFirestore.mockResolvedValue([]);
+    mockLoadPreferencesFromFirestore.mockResolvedValue(null);
+    mockLoadOnboardingStatusFromFirestore.mockResolvedValue(false);
+    mockLoadStreakFromFirestore.mockResolvedValue(DEFAULT_STREAK_STATE);
+    mockMigrateLocalStorageToFirestore.mockResolvedValue(undefined);
+
+    const contextRef: { current: ReturnType<typeof useApp> | null } = {
+      current: null,
+    };
+
+    function CaptureContext() {
+      contextRef.current = useApp();
+      return null;
+    }
+
+    render(
+      <AppProvider>
+        <CaptureContext />
+      </AppProvider>,
+    );
+
+    await waitFor(() => expect(contextRef.current).not.toBeNull());
+
+    act(() => {
+      contextRef.current?.dispatch({ type: 'ADD_TASK', payload: pendingTask });
+    });
+
+    expect(mockSaveTasksToFirestore).not.toHaveBeenCalled();
+    expect(resolveTasks).not.toBeNull();
+
+    await act(async () => {
+      resolveTasks?.([]);
+    });
+
+    await waitFor(() =>
+      expect(mockSaveTasksToFirestore).toHaveBeenCalledWith(
+        'user-1',
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'task-before-load' }),
+        ]),
+        expect.any(Number),
+        expect.objectContaining({
+          changedTasks: expect.arrayContaining([
+            expect.objectContaining({ id: 'task-before-load' }),
+          ]),
+        }),
+      ),
+    );
+  });
 });
 
