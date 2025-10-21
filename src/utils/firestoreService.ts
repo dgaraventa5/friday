@@ -1355,23 +1355,21 @@ export async function migrateTasksToFirestore(userId: string): Promise<void> {
 
       const database = await getDbOrThrow();
       const batch = writeBatch(database);
+      const tasksRef = tasksCollection(database, userId);
 
       for (const task of localTasks) {
-        const taskRef = doc(tasksCollection(database, userId));
+        const taskRef = doc(tasksRef, task.id);
         const taskWithUser = {
-          ...task,
+          ...prepareForFirestore(task),
           userId,
-          // Convert Date objects to Firestore Timestamps
-          dueDate: task.dueDate
-            ? Timestamp.fromDate(new Date(task.dueDate))
-            : null,
-          createdAt: task.createdAt
-            ? Timestamp.fromDate(new Date(task.createdAt))
-            : Timestamp.now(),
-          completedAt: task.completedAt
-            ? Timestamp.fromDate(new Date(task.completedAt))
-            : null,
         };
+
+        if (taskRef.id !== task.id) {
+          logger.warn(
+            `[Firestore] Task reference ID mismatch during migration for task ${task.id}. Reference ID: ${taskRef.id}`,
+          );
+        }
+
         batch.set(taskRef, taskWithUser);
       }
 
