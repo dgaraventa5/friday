@@ -459,29 +459,49 @@ function AppProviderComponent({ children }: { children: ReactNode }) {
   const taskSyncWaitersRef = useRef<
     { resolve: (status: TaskSyncStatus) => void; sequence: number }[]
   >([]);
+  const completedTaskSyncsRef = useRef<Map<number, TaskSyncStatus>>(new Map());
 
   const resolveTaskSyncWaiters = useCallback(
     (sequence: number, status: TaskSyncStatus) => {
-      lastCompletedTaskSyncRef.current = Math.max(
-        lastCompletedTaskSyncRef.current,
-        sequence,
-      );
+      completedTaskSyncsRef.current.set(sequence, status);
+
+      let nextSequence = lastCompletedTaskSyncRef.current + 1;
+      while (completedTaskSyncsRef.current.has(nextSequence)) {
+        lastCompletedTaskSyncRef.current = nextSequence;
+        nextSequence += 1;
+      }
 
       if (taskSyncWaitersRef.current.length === 0) {
+        // Clean up any completed sequences we can no longer observe
+        Array.from(completedTaskSyncsRef.current.keys()).forEach(
+          (completedSequence) => {
+            if (completedSequence <= lastCompletedTaskSyncRef.current) {
+              completedTaskSyncsRef.current.delete(completedSequence);
+            }
+          },
+        );
         return;
       }
 
       const remainingWaiters: typeof taskSyncWaitersRef.current = [];
 
       taskSyncWaitersRef.current.forEach(({ resolve, sequence: waiterSequence }) => {
-        if (waiterSequence <= sequence) {
-          resolve(status);
+        const completedStatus = completedTaskSyncsRef.current.get(waiterSequence);
+        if (completedStatus) {
+          resolve(completedStatus);
         } else {
           remainingWaiters.push({ resolve, sequence: waiterSequence });
         }
       });
 
       taskSyncWaitersRef.current = remainingWaiters;
+
+      // Remove any completed sequences that are now confirmed delivered
+      Array.from(completedTaskSyncsRef.current.keys()).forEach((completedSequence) => {
+        if (completedSequence <= lastCompletedTaskSyncRef.current) {
+          completedTaskSyncsRef.current.delete(completedSequence);
+        }
+      });
     },
     [],
   );

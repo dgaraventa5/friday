@@ -256,5 +256,242 @@ describe('AppProvider task migration', () => {
       ),
     );
   });
+
+  it('waitForNextTaskSync resolves only after the subsequent sync cycle completes', async () => {
+    const userPrefix = 'user_user-1_';
+    const firstTask: Task = {
+      id: 'task-in-flight',
+      name: 'Initial Task',
+      category: {
+        id: 'cat',
+        name: 'Cat',
+        color: '#fff',
+        dailyLimit: 1,
+        icon: 'briefcase',
+      },
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: new Date('2024-01-01T00:00:00.000Z'),
+      estimatedHours: 1,
+      completed: false,
+      createdAt: new Date('2024-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+      startDate: new Date('2024-01-01T00:00:00.000Z'),
+    };
+
+    const secondTask: Task = {
+      ...firstTask,
+      id: 'task-next',
+      name: 'Second Task',
+      createdAt: new Date('2024-01-02T00:00:00.000Z'),
+      updatedAt: new Date('2024-01-02T00:00:00.000Z'),
+      startDate: new Date('2024-01-02T00:00:00.000Z'),
+    };
+
+    mockLoadTasksFromFirestore.mockResolvedValue([]);
+    mockLoadCategoriesFromFirestore.mockResolvedValue([]);
+    mockLoadPreferencesFromFirestore.mockResolvedValue(null);
+    mockLoadOnboardingStatusFromFirestore.mockResolvedValue(false);
+    mockLoadStreakFromFirestore.mockResolvedValue(DEFAULT_STREAK_STATE);
+    mockMigrateLocalStorageToFirestore.mockResolvedValue(undefined);
+
+    let resolveFirstSync: () => void = () => {};
+    let resolveSecondSync: () => void = () => {};
+
+    (mockSaveTasksToFirestore as jest.Mock)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveFirstSync = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSecondSync = resolve;
+          }),
+      );
+
+    const contextRef: { current: ReturnType<typeof useApp> | null } = {
+      current: null,
+    };
+
+    function CaptureContext() {
+      contextRef.current = useApp();
+      return null;
+    }
+
+    render(
+      <AppProvider>
+        <CaptureContext />
+      </AppProvider>,
+    );
+
+    await waitFor(() => expect(contextRef.current).not.toBeNull());
+    await waitFor(() =>
+      expect(contextRef.current?.state.ui.isLoading).toBe(false),
+    );
+
+    await act(async () => {
+      contextRef.current!.dispatch({ type: 'ADD_TASK', payload: firstTask });
+    });
+
+    await waitFor(() =>
+      expect(mockSaveTasksToFirestore).toHaveBeenCalledTimes(1),
+    );
+
+    const syncPromise = contextRef.current!.waitForNextTaskSync();
+    let syncResolved = false;
+    syncPromise.then(() => {
+      syncResolved = true;
+    });
+
+    await act(async () => {
+      contextRef.current!.dispatch({ type: 'ADD_TASK', payload: secondTask });
+    });
+
+    await waitFor(() =>
+      expect(mockSaveTasksToFirestore).toHaveBeenCalledTimes(2),
+    );
+
+    await act(async () => {
+      resolveFirstSync();
+    });
+
+    expect(syncResolved).toBe(false);
+
+    await act(async () => {
+      resolveSecondSync();
+    });
+
+    const result = await syncPromise;
+    expect(syncResolved).toBe(true);
+    expect(result.status).toBe('success');
+
+    expect(
+      (mockSaveTasksToFirestore as jest.Mock).mock.calls[1][1],
+    ).toEqual(expect.arrayContaining([expect.objectContaining(secondTask)]));
+
+    expect(localStorage.getItem(`${userPrefix}tasks_unsynced`)).toBeNull();
+    expect(loadTasks(userPrefix)).toHaveLength(0);
+  });
+
+  it('does not resolve earlier waiters when a later sync finishes first', async () => {
+    mockLoadTasksFromFirestore.mockResolvedValue([]);
+    mockLoadCategoriesFromFirestore.mockResolvedValue([]);
+    mockLoadPreferencesFromFirestore.mockResolvedValue(null);
+    mockLoadOnboardingStatusFromFirestore.mockResolvedValue(false);
+    mockLoadStreakFromFirestore.mockResolvedValue(DEFAULT_STREAK_STATE);
+    mockMigrateLocalStorageToFirestore.mockResolvedValue(undefined);
+
+    let resolveFirstSync: () => void = () => {};
+    let resolveSecondSync: () => void = () => {};
+
+    (mockSaveTasksToFirestore as jest.Mock)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveFirstSync = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSecondSync = resolve;
+          }),
+      );
+
+    const contextRef: { current: ReturnType<typeof useApp> | null } = {
+      current: null,
+    };
+
+    function CaptureContext() {
+      contextRef.current = useApp();
+      return null;
+    }
+
+    render(
+      <AppProvider>
+        <CaptureContext />
+      </AppProvider>,
+    );
+
+    await waitFor(() => expect(contextRef.current).not.toBeNull());
+    await waitFor(() =>
+      expect(contextRef.current?.state.ui.isLoading).toBe(false),
+    );
+
+    const baseTask: Task = {
+      id: 'task-base',
+      name: 'Base Task',
+      category: {
+        id: 'cat',
+        name: 'Cat',
+        color: '#fff',
+        dailyLimit: 1,
+        icon: 'briefcase',
+      },
+      importance: 'important',
+      urgency: 'urgent',
+      dueDate: new Date('2024-01-01T00:00:00.000Z'),
+      estimatedHours: 1,
+      completed: false,
+      createdAt: new Date('2024-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+      startDate: new Date('2024-01-01T00:00:00.000Z'),
+    };
+
+    const followUpTask: Task = {
+      ...baseTask,
+      id: 'task-follow-up',
+      name: 'Follow Up Task',
+      createdAt: new Date('2024-01-03T00:00:00.000Z'),
+      updatedAt: new Date('2024-01-03T00:00:00.000Z'),
+      startDate: new Date('2024-01-03T00:00:00.000Z'),
+    };
+
+    const firstSyncPromise = contextRef.current!.waitForNextTaskSync();
+    let firstSyncResult: { status: string; message?: string } | null = null;
+    firstSyncPromise.then((result) => {
+      firstSyncResult = result;
+    });
+
+    await act(async () => {
+      contextRef.current!.dispatch({ type: 'ADD_TASK', payload: baseTask });
+    });
+
+    await waitFor(() =>
+      expect(mockSaveTasksToFirestore).toHaveBeenCalledTimes(1),
+    );
+
+    const secondSyncPromise = contextRef.current!.waitForNextTaskSync();
+    let secondSyncResult: { status: string; message?: string } | null = null;
+    secondSyncPromise.then((result) => {
+      secondSyncResult = result;
+    });
+
+    await act(async () => {
+      contextRef.current!.dispatch({ type: 'ADD_TASK', payload: followUpTask });
+    });
+
+    await waitFor(() =>
+      expect(mockSaveTasksToFirestore).toHaveBeenCalledTimes(2),
+    );
+
+    await act(async () => {
+      resolveSecondSync();
+    });
+
+    await expect(secondSyncPromise).resolves.toEqual({ status: 'success' });
+    expect(secondSyncResult).toEqual({ status: 'success' });
+    expect(firstSyncResult).toBeNull();
+
+    await act(async () => {
+      resolveFirstSync();
+    });
+
+    await expect(firstSyncPromise).resolves.toEqual({ status: 'success' });
+    expect(firstSyncResult).toEqual({ status: 'success' });
+  });
 });
 
