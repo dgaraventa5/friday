@@ -2,23 +2,30 @@ import {
   CollectionReference,
   Firestore,
   collection,
+  doc,
   query,
   where,
 } from 'firebase/firestore';
 import type { Task } from '../types/task';
+import { db as sharedDb } from './firebase';
 
-type TaskWithUserId = Task & { userId: string };
+type TaskDocument = Task & { userId: string; ownerUid: string };
 
 export const tasksCollection = (
-  db: Firestore,
   uid: string,
-): CollectionReference<TaskWithUserId> => {
+  database: Firestore = sharedDb,
+): CollectionReference<TaskDocument> => {
   if (!uid) {
     throw new Error('Cannot create a tasks reference without a uid');
   }
 
-  return collection(db, 'tasks') as CollectionReference<TaskWithUserId>;
+  return collection(
+    doc(collection(database, 'users'), uid),
+    'tasks',
+  ) as CollectionReference<TaskDocument>;
 };
 
-export const tasksQueryForUser = (db: Firestore, uid: string) =>
-  query(tasksCollection(db, uid), where('userId', '==', uid));
+export const tasksQueryForUser = (
+  uid: string,
+  database: Firestore = sharedDb,
+) => query(tasksCollection(uid, database), where('ownerUid', '==', uid));

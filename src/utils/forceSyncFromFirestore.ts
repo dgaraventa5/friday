@@ -1,12 +1,12 @@
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { getDocs } from 'firebase/firestore';
 import { Task } from '../types/task';
 import {
   getFirestoreDb,
-  COLLECTIONS,
   convertTimestamps,
 } from './firestoreService';
 import { saveTasks, loadTasks } from './localStorage';
 import logger from './logger';
+import { tasksQueryForUser } from '../lib/tasksRef';
 
 /**
  * Force syncs tasks from Firestore for a specific user
@@ -20,9 +20,7 @@ export async function forceSyncTasksFromFirestore(
   try {
     const database = await getFirestoreDb();
     // Fetch the latest tasks from Firestore
-    const tasksRef = collection(database, COLLECTIONS.TASKS);
-    const q = query(tasksRef, where('userId', '==', userId));
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(tasksQueryForUser(userId, database));
 
     logger.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
 
@@ -32,17 +30,22 @@ export async function forceSyncTasksFromFirestore(
 
     querySnapshot.forEach((document) => {
       const taskData = convertTimestamps(document.data());
-      // Remove userId field as it's not part of the Task interface
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { userId: _taskUserId, ...taskWithoutUserId } = taskData;
+      // Remove user identifiers as they're not part of the Task interface
+      const {
+        userId: taskUserId,
+        ownerUid: taskOwnerUid,
+        ...taskWithoutOwner
+      } = taskData;
+      void taskUserId;
+      void taskOwnerUid;
 
       // Only add the task if we haven't seen this ID before
-      if (!taskIds.has(taskWithoutUserId.id)) {
-        taskIds.add(taskWithoutUserId.id);
-        tasks.push(taskWithoutUserId as Task);
+      if (!taskIds.has(taskWithoutOwner.id)) {
+        taskIds.add(taskWithoutOwner.id);
+        tasks.push(taskWithoutOwner as Task);
       } else {
         logger.warn(
-          `[Firestore] Duplicate task ID detected: ${taskWithoutUserId.id}, skipping`,
+          `[Firestore] Duplicate task ID detected: ${taskWithoutOwner.id}, skipping`,
         );
       }
     });
