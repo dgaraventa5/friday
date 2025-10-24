@@ -1,11 +1,8 @@
 // Firestore service for task management
 import {
-  collection,
   doc,
   setDoc,
   getDocs,
-  query,
-  where,
   writeBatch,
   Timestamp,
   DocumentData,
@@ -406,9 +403,9 @@ export async function saveTasksToFirestore(
         `[Firestore] Preparing to persist ${tasksToUpsert.size} updated tasks and ${deletedTaskIds.length} deletions for user: ${userId} (attempt ${attempt})`,
       );
 
-      const tasksRef = tasksCollection(database, userId);
+      const tasksRef = tasksCollection(userId, database);
       const querySnapshot = await getDocs(
-        tasksQueryForUser(database, userId),
+        tasksQueryForUser(userId, database),
       );
 
       const activeTaskIds = new Set(tasks.map((task) => task.id));
@@ -453,6 +450,7 @@ export async function saveTasksToFirestore(
         toFirestoreTask: (task) => ({
           ...prepareForFirestore(task),
           userId,
+          ownerUid: userId,
         }),
       });
     });
@@ -521,7 +519,7 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
       );
 
       const querySnapshot = await getDocs(
-        tasksQueryForUser(database, userId),
+        tasksQueryForUser(userId, database),
       );
 
       logger.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
@@ -560,20 +558,25 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
 
       querySnapshot.forEach((document) => {
         const taskData = convertTimestamps(document.data());
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { userId: _taskUserId, ...taskWithoutUserId } = taskData;
+        const {
+          userId: taskUserId,
+          ownerUid: taskOwnerUid,
+          ...taskWithoutUserFields
+        } = taskData;
+        void taskUserId;
+        void taskOwnerUid;
 
-        if (!taskIds.has(taskWithoutUserId.id)) {
-          taskIds.add(taskWithoutUserId.id);
+        if (!taskIds.has(taskWithoutUserFields.id)) {
+          taskIds.add(taskWithoutUserFields.id);
           tasks.push({
-            ...(taskWithoutUserId as Task),
+            ...(taskWithoutUserFields as Task),
             recurringDays: normalizeRecurringDays(
-              (taskWithoutUserId as Task).recurringDays,
+              (taskWithoutUserFields as Task).recurringDays,
             ),
           });
         } else {
           logger.warn(
-            `[Firestore] Duplicate task ID detected: ${taskWithoutUserId.id}, skipping`,
+            `[Firestore] Duplicate task ID detected: ${taskWithoutUserFields.id}, skipping`,
           );
         }
       });
@@ -1357,13 +1360,14 @@ export async function migrateTasksToFirestore(userId: string): Promise<void> {
 
       const database = await getDbOrThrow();
       const batch = writeBatch(database);
-      const tasksRef = tasksCollection(database, userId);
+      const tasksRef = tasksCollection(userId, database);
 
       for (const task of localTasks) {
         const taskRef = doc(tasksRef, task.id);
         const taskWithUser = {
           ...prepareForFirestore(task),
           userId,
+          ownerUid: userId,
         };
 
         if (taskRef.id !== task.id) {
@@ -1395,17 +1399,16 @@ export async function fetchTasksFromFirestore(userId: string): Promise<Task[]> {
     const database = await getDbOrThrow();
 
     logger.log(`[Firestore] Fetching tasks for user ${userId}`);
-    const tasksQuery = tasksQueryForUser(database, userId);
+    const tasksQuery = tasksQueryForUser(userId, database);
     const querySnapshot = await getDocs(tasksQuery);
 
     const tasks: Task[] = [];
     querySnapshot.forEach((doc) => {
-      const taskData = doc.data();
-      const task = convertTimestamps({
-        id: doc.id,
-        ...taskData,
-      });
-      tasks.push(task as Task);
+      const taskData = convertTimestamps(doc.data());
+      const { userId: taskUserId, ownerUid: taskOwnerUid, ...taskFields } = taskData;
+      void taskUserId;
+      void taskOwnerUid;
+      tasks.push({ id: doc.id, ...(taskFields as Task) });
     });
 
     logger.log(`[Firestore] Fetched ${tasks.length} tasks`);
@@ -1483,7 +1486,7 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
 
       // Fetch the latest tasks
       logger.log('[Firestore] Fetching latest data from server');
-      const tasksQuery = tasksQueryForUser(database, userId);
+      const tasksQuery = tasksQueryForUser(userId, database);
 
       const querySnapshot = await getDocs(tasksQuery);
 
@@ -1498,18 +1501,23 @@ export async function forceSyncFromFirestore(userId: string): Promise<Task[]> {
       // Process the results
       const tasks: Task[] = [];
       querySnapshot.forEach((doc) => {
-        const taskData = doc.data();
-        // Log the user ID from the task data for debugging
+        const taskData = convertTimestamps(doc.data());
+        // Log the user and owner IDs from the task data for debugging
+        logger.log('[Firestore DEBUG] Task user ID in document:', taskData.userId);
         logger.log(
-          '[Firestore DEBUG] Task user ID in document:',
-          taskData.userId,
+          '[Firestore DEBUG] Task owner UID in document:',
+          taskData.ownerUid,
         );
 
-        const task = convertTimestamps({
-          id: doc.id,
-          ...taskData,
-        });
-        tasks.push(task as Task);
+        const {
+          userId: taskUserId,
+          ownerUid: taskOwnerUid,
+          ...taskFields
+        } = taskData;
+        void taskUserId;
+        void taskOwnerUid;
+
+        tasks.push({ id: doc.id, ...(taskFields as Task) });
       });
 
       // Verify the data was actually fetched from the server
