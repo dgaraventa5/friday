@@ -1,8 +1,11 @@
 // Firestore service for task management
 import {
+  collection,
   doc,
   setDoc,
   getDocs,
+  query,
+  where,
   writeBatch,
   Timestamp,
   DocumentData,
@@ -97,6 +100,59 @@ const getLatestUpdatedAt = (tasks: Task[]): number =>
       : 0;
     return Math.max(latest, updatedAt);
   }, 0);
+
+const migrateLegacyTasksForUser = async (
+  userId: string,
+  database: Firestore,
+): Promise<boolean> => {
+  const legacyTasksQuery = query(
+    collection(database, 'tasks'),
+    where('userId', '==', userId),
+  );
+
+  const legacySnapshot = await getDocs(legacyTasksQuery);
+
+  if (legacySnapshot.empty) {
+    logger.log(
+      `[Firestore] No legacy tasks found for user ${userId}; skipping migration`,
+    );
+    return false;
+  }
+
+  logger.log(
+    `[Firestore] Migrating ${legacySnapshot.size} legacy tasks for user ${userId} to subcollection`,
+  );
+
+  const userTasksCollection = tasksCollection(userId, database);
+  const batch = writeBatch(database);
+
+  legacySnapshot.forEach((legacyDoc) => {
+    const legacyData = convertTimestamps(legacyDoc.data()) as Task & {
+      userId?: string;
+      ownerUid?: string;
+    };
+
+    const normalizedTask: Task = {
+      ...legacyData,
+      recurringDays: normalizeRecurringDays(legacyData.recurringDays),
+    };
+
+    batch.set(doc(userTasksCollection, legacyDoc.id), {
+      ...prepareForFirestore(normalizedTask),
+      userId,
+      ownerUid: userId,
+    });
+    batch.delete(legacyDoc.ref);
+  });
+
+  await batch.commit();
+
+  logger.log(
+    `[Firestore] Legacy task migration complete for user ${userId}`,
+  );
+
+  return true;
+};
 
 export class FirestoreSyncError extends Error {
   queued: boolean;
@@ -518,9 +574,29 @@ export async function loadTasksFromFirestore(userId: string): Promise<Task[]> {
         `[Firestore] Loading tasks for user: ${userId} with persistence type: ${persistenceType}`,
       );
 
-      const querySnapshot = await getDocs(
+      let querySnapshot = await getDocs(
         tasksQueryForUser(userId, database),
       );
+
+      if (querySnapshot.size === 0) {
+        try {
+          const migrated = await migrateLegacyTasksForUser(userId, database);
+          if (migrated) {
+            logger.log(
+              `[Firestore] Reloading tasks for user ${userId} after migration`,
+            );
+            querySnapshot = await getDocs(
+              tasksQueryForUser(userId, database),
+            );
+          }
+        } catch (migrationError) {
+          logger.error(
+            `[Firestore] Failed to migrate legacy tasks for user ${userId}:`,
+            migrationError,
+          );
+          throw migrationError;
+        }
+      }
 
       logger.log(`[Firestore] Found ${querySnapshot.size} tasks from server`);
 
