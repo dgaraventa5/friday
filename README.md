@@ -1,170 +1,113 @@
-# Friday - Low-Stress Task Manager
+# Friday
 
-<p align="center">
-  <img src="https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.vecteezy.com%2Ffree-vector%2Ftree-of-life&psig=AOvVaw28lNLx3kxsyOQ-l8Jln7Pf&ust=1750637038084000&source=images&cd=vfe&opi=89978449&ved=0CBEQjRxqFwoTCMiI-avdg44DFQAAAAAdAAAAABAE" alt="Friday App Logo" width="200" height="200">
-</p>
+![Friday hero showing prioritized tasks](public/hero-demo.svg)
 
-Friday is a focused to-do list app designed for busy professionals and
-neurodivergent users seeking a low-stress way to manage daily priorities. The
-app leverages the Eisenhower Matrix and simple category-based limits to surface
-no more than four essential tasks per day, reducing cognitive load and helping
-users achieve well-rounded, intentional productivity.
+Friday is a low-stress task manager that keeps you focused on the four most important things you can accomplish today. The app combines the Eisenhower Matrix with gentle daily limits, recurring task automation, and streak tracking so you can move your goals forward without burning out.
 
-## ✨ Features
+## Feature highlights
 
-- **Intelligent Task Prioritization**: Automatically surfaces your top 4 tasks
-  each day based on importance, urgency, and due dates
-- **Category Management**: Balance your life by setting limits for different
-  categories (Work, Home, Health, etc.)
-- **Quick Task Input**: Add, edit, and delete tasks with minimal steps
-- **Recurring Tasks**: Create tasks that repeat on chosen intervals
-- **Clean, Distraction-Free UI**: Focus on what matters with a minimalist
-  interface
-- **Google Authentication**: Secure and easy login
+- **Today view:** Surfaces up to four tasks per day with a progress circle, daily streak indicator, and celebration state when everything is complete. Completed items remain visible alongside in-progress work so you can see momentum build.
+- **Full schedule:** Switch to the schedule tab to review every upcoming task grouped by start date. Virtualized rendering keeps scrolling smooth even with large task lists.
+- **Rich task creation:** Capture tasks with category, importance, urgency, estimated hours, due dates, and optional recurrence rules. Inputs normalize dates automatically so they work seamlessly across time zones.
+- **Category + hour limits:** Configure weekday/weekend limits per category along with overall daily hour caps to maintain balance across work, home, health, and more.
+- **Recurring automation:** Recurring tasks carry a shared series ID, generate future instances automatically, and respect category limits when they land on today.
+- **Guided onboarding:** First-time users move through an onboarding flow that explains prioritization, captures an initial task, and stores completion status in Firestore/local storage.
+- **Google sign-in:** Authentication uses Firebase Google Sign-In and persists user data (tasks, preferences, streaks) to Firestore with offline-friendly local caching and retry queues.
+- **Developer utilities:** Signed-in users can toggle a debug drawer to reset data, view task allocation for today/tomorrow, and enable "test mode" to revisit onboarding.
 
-## 📱 Live Demo
+## Architecture at a glance
 
-_Coming soon!_ The app will be deployed to Firebase Hosting.
+- **Stack:** React 19 + TypeScript + Vite, styled with Tailwind CSS and iconography from lucide-react.
+- **State management:** Custom context providers (`AppContext`, `AuthContext`) coordinate tasks, preferences, onboarding, streaks, and auth status.
+- **Data layer:** Firebase Authentication + Cloud Firestore with localStorage fallback, offline persistence, and batched writes.
+- **Scheduling logic:** `taskPrioritization` utilities score tasks via the Eisenhower Matrix, enforce category/hour limits, and assign start dates across a configurable lookahead window.
+- **Testing:** Jest with React Testing Library for component and utility coverage.
 
-## 🚀 Getting Started
+## Getting started
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
-- npm or yarn
-- A Firebase project with Google Authentication enabled
+- Node.js 18+ (aligned with the Vite + Jest toolchain)
+- npm (bundled with Node) or pnpm/yarn
+- A Firebase project with Google Authentication and Cloud Firestore enabled
 
 ### Installation
 
-1. Clone the repository
+1. Clone the repository and install dependencies:
 
-   ```
+   ```bash
    git clone https://github.com/dgaraventa5/friday.git
-   cd friday-bolt
-   ```
-
-2. Install dependencies
-
-   ```
+   cd friday
    npm install
    ```
 
-3. Create a `.env` file in the project root with your Firebase configuration
+2. Copy the example environment file and fill in your Firebase/analytics configuration:
 
-   ```
-   VITE_FIREBASE_API_KEY=your-api-key
-   VITE_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
-   VITE_FIREBASE_PROJECT_ID=your-project-id
-   VITE_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
-   VITE_FIREBASE_APP_ID=your-app-id
+   ```bash
+   cp .env.example .env.local
    ```
 
-4. Start the development server
+   | Variable | Purpose |
+   | --- | --- |
+   | `VITE_FIREBASE_*` | Firebase web app credentials (Auth + Firestore) |
+   | `VITE_GA_MEASUREMENT_ID` | Optional Google Analytics measurement ID |
+   | `VITE_APP_ENV` | Environment label (`development`, `staging`, `production`) |
+   | `VITE_ONBOARDING_V1` | Feature flag for the current onboarding flow |
 
-   ```
+3. Start the development server:
+
+   ```bash
    npm run dev
    ```
 
-5. Open your browser and navigate to `http://localhost:5173`
+4. Open the app at [http://localhost:5173](http://localhost:5173). Sign in with Google to sync data to your Firebase project. Use `/onboarding` if you need to replay the guided tour.
 
-### Building for Production
+### Production build & preview
 
-```
+```bash
 npm run build
+npm run preview
 ```
 
-## 🔧 Technologies Used
+Deploy the generated `dist/` folder to Firebase Hosting (see `firebase.json`) or your hosting provider of choice.
 
-- **React** - UI framework
-- **TypeScript** - Type safety
-- **Vite** - Build tool
-- **Firebase** - Authentication and data storage
-- **Tailwind CSS** - Styling
+## Available scripts
 
-## 🧠 Philosophy
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Launches Vite in development mode with hot module reloading |
+| `npm run build` | Produces an optimized production bundle |
+| `npm run preview` | Serves the production build locally |
+| `npm run lint` | Runs ESLint across the codebase |
+| `npm run lint:fix` | Lints and attempts to automatically fix issues |
+| `npm run test` | Executes the Jest test suite |
+| `npm run format` | Applies Prettier formatting to supported files |
 
-Friday is built on the principle that **less is more** when it comes to task
-management. By showing only your top 4 tasks each day, the app helps you:
+## Project structure
 
-- Focus on what truly matters
-- Reduce decision fatigue
-- Maintain balance across different life areas
-- Feel accomplished rather than overwhelmed
-
-## 🔒 Security & Privacy
-
-- Authentication handled securely through Firebase
-- User data is never sold or shared
-- Environment variables keep API keys and secrets secure
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for
-details.
-
-## 📞 Contact
-
-Your Name - [@yourtwitter](https://twitter.com/yourtwitter) - email@example.com
-
-Project Link:
-[https://github.com/dgaraventa5/friday](https://github.com/dgaraventa5/friday)
-
-## Layout Guidelines
-
-### Viewport Height Optimization
-
-All pages in the app are designed to fit within the viewport without scrolling,
-with the exception of the SchedulePage view which allows scrolling. This creates
-a more app-like experience and reduces the need for users to scroll.
-
-To implement this pattern in new pages:
-
-1. Use the `PageLayout` component which handles viewport height constraints:
-
-```tsx
-import { PageLayout } from './components/PageLayout';
-
-// For standard pages (no scrolling)
-export function YourPage() {
-  return (
-    <PageLayout title="Your Page Title">{/* Your content here */}</PageLayout>
-  );
-}
-
-// For pages that need scrolling
-export function YourScrollablePage() {
-  return (
-    <PageLayout title="Your Page Title" allowScroll={true}>
-      {/* Your scrollable content here */}
-    </PageLayout>
-  );
-}
+```
+src/
+  components/       Reusable UI building blocks (task list, inputs, modals, etc.)
+  context/          React context providers for auth and global app state
+  lib/              Firestore collection refs and helper bindings
+  routes/           Top-level routed experiences (e.g., onboarding)
+  types/            Shared TypeScript interfaces for tasks, users, streaks
+  utils/            Task scoring, Firestore accessors, date helpers, analytics
+public/             Static assets served by Vite/Firebase Hosting
+docs/               Product and UX specifications for future work
 ```
 
-2. The app uses CSS variables to manage consistent heights:
+Additional documentation lives in [`docs/`](docs/), including UI guidelines, product requirements, onboarding flow notes, and delight/gamification explorations.
 
-   - `--header-height`: 72px
-   - `--bottom-nav-height`: 64px
+## Contributing
 
-3. Two utility classes are available:
-   - `.viewport-height`: For pages that should not scroll
-   - `.schedule-page`: For pages that should allow scrolling
+1. Fork the repository and create a feature branch: `git checkout -b feature/amazing-feature`
+2. Make your changes and ensure quality checks pass:
+   - `npm run lint`
+   - `npm run test`
+3. Commit with a descriptive message and open a Pull Request.
+4. Please include screenshots or Loom demos for UI updates when possible.
 
-See the UI guidelines in `docs/ui-guidelines.md` for more details.
+## License
 
----
-
-<p align="center">
-  Made with ❤️ for a less stressful life
-</p>
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
